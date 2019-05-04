@@ -138,12 +138,8 @@ export const verifyAssertion = async (opts) => {
       console.info("Credential not stored on server side");
       return Promise.resolve(null);
     }
-    if (options.allowCredentials[0].id === credId) {      
-      let cred = options.allowCredentials[0];
+    for (let cred of options.allowCredentials) {
       cred.id = base64url.decode(cred.id);
-    } else {
-      console.info("Stored credential didn't match");
-      return Promise.resolve(null);
     }
 
     const cred = await navigator.credentials.get({
@@ -158,10 +154,13 @@ export const verifyAssertion = async (opts) => {
   }
 };
 
-export const unregisterCredential = async () => {
+export const unregisterCredential = async (credId) => {
   try {
-    localStorage.removeItem('credential');
-    return _fetch('/auth/removeKey');
+    const _credId = localStorage.getItem('credential');
+    if (credId === _credId) {
+      localStorage.removeItem('credential');
+    }
+    return _fetch(`/auth/removeKey?credId=${encodeURIComponent(credId)}`);
   } catch (e) {
     throw e;
   }

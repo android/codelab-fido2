@@ -33,10 +33,10 @@
         Welcome, {{username}}!
       </h2>
       <h3>
-        Your registered credential:
+        Your registered credentials:
       </h3>
-      <ul id="list">
-      </ul>
+      <section id="list">
+      </section>
       <p>
         <a href="/">Try reauth</a>
       </p>
@@ -47,9 +47,11 @@
     <script type="module">
       import { _fetch, registerCredential, unregisterCredential } from '/client.js';
       import { html, render } from 'https://unpkg.com/lit-html@1.0.0/lit-html.js?module';
+      import { repeat } from 'https://unpkg.com/lit-html@1.0.0/directives/repeat.js?module';
 
       const makeCredential = async () => {
         registerCredential({
+          attestation: 'none',
           authenticatorSelection: {
             authenticatorAttachment: 'platform',
             userVerification: 'required'
@@ -64,7 +66,7 @@
         })
         .catch(e => {
           if (e) {
-            alert(e.error);
+            alert(e);
           } else {
             alert('Unkown error.');
           }
@@ -74,20 +76,18 @@
       const getCredential = () => {
         _fetch('/auth/getKey').then(res => {
           const list = document.querySelector('#list');
-          const li = html`${res && res.credential ?
-            html`<li>${res.credential}
-              <button id="${res.credential}" @click=${removeCredential}>Remove</button>
-            </li>` :
-            html`<li>None: 
-              <button @click=${makeCredential}>Register a new credential</button>
-            </li>`
-          }`
+          const li = html`<ul>
+            ${repeat(res.credentials, cred => cred.credId, (cred, index) => html`<li>${cred.credId}
+              <button id="${cred.credId}" @click=${removeCredential}>Remove</button>
+            </li>`)}
+            </ul>
+            <button @click=${makeCredential}>Register a new credential</button>`
           render(li, list);
         });
       };
 
       const removeCredential = e => {
-        unregisterCredential()
+        unregisterCredential(e.target.id)
         .then(() => {
           getCredential();
         })
