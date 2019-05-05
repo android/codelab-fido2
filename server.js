@@ -39,18 +39,23 @@ app.get('/home', function(req, res) {
   if (!req.cookies.username) {
     // If user is not signed in, redirect to `/`.
     res.redirect(307, '/');
+    return;
   }
   // `home.html` shows sign-out link
-  // TODO: When developed, allow user to register their authenticator
   res.render('home.html', {username: req.cookies.username});
 });
 
-app.get('/reauth', function(req, res) {
+app.all('/reauth', function(req, res) {
+  const username = req.body.username;
+  if (username == '') {
+    res.redirect(307, '/');
+    return;
+  }
+  res.cookie('username', username);
   // Show `reauth.html`.
   // User is supposed to enter a password (which will be ignored)
   // Make XHR POST to `/signin`
-  // TODO: When developed, do fingerprint reauth
-  res.render('reauth.html', {username: req.cookies.username});
+  res.render('reauth.html', {username: username});
 });
 
 app.use('/auth', auth);

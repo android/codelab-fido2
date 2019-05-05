@@ -87,65 +87,37 @@ const coerceToArrayBuffer = (buf, name) => {
     return buf;
 }
 
+const csrfCheck = (req, res, next) => {
+  if (req.header('X-Requested-With') != 'XMLHttpRequest') {
+    res.status(400).json({error: 'invalid access.'});
+    return;
+  }
+  next();
+};
+
 /**
  * Checks CSRF protection using custom header `X-Requested-With`
  * If cookie doesn't contain `username`, consider the user is not authenticated.
  **/
 const sessionCheck = (req, res, next) => {
-  if (req.header('X-Requested-With') != 'XMLHttpRequest') {
-    res.status(400).json({error: 'invalid access.'});
-    return;
-  }
-  if (!req.cookies.username) {
+  if (req.cookies['signed-in'] != 'yes') {
     res.status(401).json({error: 'not signed in.'});
     return;
   }
   next();
 };
 
-// const verifyCredential = (credential, challenge, origin) => {
-//   const attestationObject = credential.attestationObject;
-//   const authenticatorData = credential.authenticatorData;
-//   if (!attestationObject && !authenticatorData)
-//     throw 'Invalid request.';
-
-//   const clientDataJSON = credential.clientDataJSON;
-//   // const signature = credential.signature;
-//   // const userHandle = credential.userHandle;
-//   const clientData = JSON.parse(base64url.decode(clientDataJSON));
-
-//   if (clientData.challenge !== challenge)
-//     throw 'Wrong challenge code.';
-
-//   if (clientData.origin !== origin)
-//     throw 'Wrong origin.';
-
-//   // Temporary workaround for inmature CBOR
-//   // const buffer = base64url.toBuffer(attestationObject || authenticatorData);
-//   // const response = cbor.decodeAllSync(buffer)[0];
-
-//   const response = {};
-//   response.fmt = 'none';
-
-//   return response;
-// };
-
 /**
  * Verifies user credential and let the user sign-in.
  * No preceding registration required.
  * This only checks if `username` is not empty string and ignores the password.
  **/
-router.post('/signin', upload.array(), (req, res) => {
-  if (req.header('X-Requested-With') != 'XMLHttpRequest') {
-    res.status(400).json({error: 'invalid access.'});
-    return;
-  }
-  const username = req.body.username;
-  // If cookie doesn't contain a username, let in as long as `username` present (Ignore password)
+router.post('/signin', upload.array(), csrfCheck, (req, res) => {
+  const username = req.cookies.username;
+  // Only check username, no need to check password as this is a mock
   if (!username) {
-    // If sign-in failed, return 401.
-    res.status(400).json({error: 'invalid username.'});
-  // If cookie contains a username (already signed in, this is reauth), let the user sign-in
+    res.status(401).send('Unauthorized');
+    return;
   } else {
     // See if account already exists
     let user = db.get('users')
@@ -162,16 +134,17 @@ router.post('/signin', upload.array(), (req, res) => {
         .push(user)
         .write();
     }
-    res.cookie('username', username);
+    // Simple session cookie
+    res.cookie('signed-in', 'yes');
     // If sign-in succeeded, redirect to `/home`.
     res.status(200).json(user);
   }
-  return;
 });
 
 router.get('/signout', function(req, res) {
-  // Remove cookie
+  // Remove cookies
   res.clearCookie('username');
+  res.clearCookie('signed-in');
   // Redirect to `/`
   res.redirect(307, '/');
 });
@@ -208,7 +181,7 @@ router.get('/signout', function(req, res) {
  *   credential: String
  * }```
  **/
-router.post('/getKey', upload.array(), sessionCheck, (req, res) => {
+router.post('/getKey', upload.array(), csrfCheck, sessionCheck, (req, res) => {
   const user = db.get('users')
     .find({ username: req.cookies.username })
     .value();
@@ -219,7 +192,7 @@ router.post('/getKey', upload.array(), sessionCheck, (req, res) => {
  * Removes a credential id attached to the user
  * Responds with empty JSON `{}`
  **/
-router.post('/removeKey', upload.array(), sessionCheck, (req, res) => {
+router.post('/removeKey', upload.array(), csrfCheck, sessionCheck, (req, res) => {
   const credId = req.query.credId;
   const username = req.cookies.username;
   const user = db.get('users')
@@ -281,7 +254,7 @@ router.get('/resetDB', upload.array(), (req, res) => {
      attestation: ('none'|'indirect'|'direct')
  * }```
  **/
-router.post('/registerRequest', sessionCheck, async (req, res) => {
+router.post('/registerRequest', csrfCheck, sessionCheck, async (req, res) => {
   const username = req.cookies.username;
   const user = db.get('users')
     .find({ username: username })
@@ -356,7 +329,7 @@ router.post('/registerRequest', sessionCheck, async (req, res) => {
      }
  * }```
  **/
-router.post('/registerResponse', upload.array(), sessionCheck, async (req, res) => {
+router.post('/registerResponse', upload.array(), csrfCheck, sessionCheck, async (req, res) => {
   const username = req.cookies.username;
   const challenge = coerceToArrayBuffer(req.cookies.challenge, 'challenge');
   const credId = req.body.id;
@@ -402,6 +375,7 @@ router.post('/registerResponse', upload.array(), sessionCheck, async (req, res) 
     // Respond with user info
     res.json(user);
   } catch (e) {
+    res.clearCookie('challenge');
     res.status(400).send(e);
   }
 });
@@ -420,7 +394,7 @@ router.post('/registerResponse', upload.array(), sessionCheck, async (req, res) 
      }, ...]
  * }```
  **/
-router.post('/signinRequest', upload.array(), sessionCheck, async (req, res) => {
+router.post('/signinRequest', upload.array(), csrfCheck, async (req, res) => {
   try {
     const user = db.get('users')
       .find({ username: req.cookies.username })
@@ -464,7 +438,7 @@ router.post('/signinRequest', upload.array(), sessionCheck, async (req, res) => 
      }
  * }```
  **/
-router.post('/signinResponse', upload.array(), sessionCheck, async (req, res) => {
+router.post('/signinResponse', upload.array(), csrfCheck, async (req, res) => {
   const credId = req.body.id;
 
   // Query the user
@@ -510,9 +484,10 @@ router.post('/signinResponse', upload.array(), sessionCheck, async (req, res) =>
     const result = await f2l.assertionResult(clientAssertionResponse, assertionExpectations);
 
     res.clearCookie('challenge');
+    res.cookie('signed-in', 'yes');
 
-    credential.counter = result.authnrData.get("counter");
-    
+    credential.prevCounter = result.authnrData.get("counter");
+
     db.get('users')
       .find({ id: req.cookies.id })
       .assign(user)
@@ -520,6 +495,7 @@ router.post('/signinResponse', upload.array(), sessionCheck, async (req, res) =>
 
     res.json(user);
   } catch (e) {
+    res.clearCookie('challenge');
     res.status(400).send(e);
   }
 });

@@ -9,7 +9,7 @@ export const _fetch = async (path, payload = '') => {
   try {
     const res = await fetch(path, {
       method: 'POST',
-      credentials: 'include',
+      credentials: 'same-origin',
       headers: headers,
       body: payload
     });
@@ -37,15 +37,9 @@ const encodeAuthenticatorAttestationResponse = (atts) => {
       base64url.encode(atts.response.clientDataJSON);
     const attestationObject =
       base64url.encode(atts.response.attestationObject);
-    const signature =
-      base64url.encode(atts.response.signature);
-    const userHandle =
-      base64url.encode(atts.response.userHandle);
     credential.response = {
       clientDataJSON,
-      attestationObject,
-      signature,
-      userHandle
+      attestationObject
     };
   }
   return credential;
@@ -79,8 +73,6 @@ export const registerCredential = async (opts) => {
     });
 
     const parsedCred = await encodeAuthenticatorAttestationResponse(cred);
-    
-    localStorage.setItem('credential', parsedCred.id);
 
     return await _fetch('/auth/registerResponse' , parsedCred);
   } catch (e) {
@@ -124,13 +116,8 @@ export const verifyAssertion = async (opts) => {
       console.info('User Verifying Platform Authenticator not available.');
       return Promise.resolve(null);
     }
-    const credId = localStorage.getItem('credential');
-    if (!credId) {
-      console.info('No stored credential found on this browser.');
-      return Promise.resolve(null);
-    }
 
-    const options = await _fetch(`/auth/signinRequest?credId=${encodeURIComponent(credId)}`);
+    const options = await _fetch('/auth/signinRequest');
 
     options.challenge = base64url.decode(options.challenge);
 
@@ -155,13 +142,5 @@ export const verifyAssertion = async (opts) => {
 };
 
 export const unregisterCredential = async (credId) => {
-  try {
-    const _credId = localStorage.getItem('credential');
-    if (credId === _credId) {
-      localStorage.removeItem('credential');
-    }
-    return _fetch(`/auth/removeKey?credId=${encodeURIComponent(credId)}`);
-  } catch (e) {
-    throw e;
-  }
+  return _fetch(`/auth/removeKey?credId=${encodeURIComponent(credId)}`);
 };
