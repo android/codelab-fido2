@@ -24,7 +24,7 @@ app.use((req, res, next) => {
 });
 
 // http://expressjs.com/en/starter/basic-routing.html
-app.get('/', function(req, res) {
+app.get('/', (req, res) => {
   // Check cookie
   if (req.cookies.username) {
     // If user is signed in, redirect to `/reauth`.
@@ -35,7 +35,7 @@ app.get('/', function(req, res) {
   res.render('index.html');
 });
 
-app.get('/home', function(req, res) {
+app.get('/home', (req, res) => {
   if (!req.cookies.username) {
     // If user is not signed in, redirect to `/`.
     res.redirect(307, '/');
@@ -45,13 +45,12 @@ app.get('/home', function(req, res) {
   res.render('home.html', {username: req.cookies.username});
 });
 
-app.all('/reauth', function(req, res) {
-  const username = req.body.username;
-  if (username == '') {
-    res.redirect(307, '/');
+app.get('/reauth', (req, res) => {
+  const username = req.cookies.username;
+  if (!username) {
+    res.redirect(302, '/');
     return;
   }
-  res.cookie('username', username);
   // Show `reauth.html`.
   // User is supposed to enter a password (which will be ignored)
   // Make XHR POST to `/signin`
@@ -61,6 +60,6 @@ app.all('/reauth', function(req, res) {
 app.use('/auth', auth);
 
 // listen for req :)
-const listener = app.listen(process.env.PORT, function() {
+const listener = app.listen(process.env.PORT, () => {
   console.log('Your app is listening on port ' + listener.address().port);
 });

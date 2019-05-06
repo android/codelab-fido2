@@ -27,15 +27,30 @@
         WebAuthn codelab
       </h1>
     </header>
-
     <main>
       <h2>
-        Login with random id/password
+        Login with a random username
       </h2>
       <form id="form" method="POST" action="/reauth" >
         username: <input type="text" name="username" placeholder="Whatever" value="" />
         <input type="submit" value="Next" />
       </form>
+      <script type="module">
+        import { _fetch } from '/client.js';
+        const form = document.querySelector('#form');
+        form.addEventListener('submit', e => {
+          e.preventDefault();
+          const form = new FormData(e.target);
+          const cred = {};
+          form.forEach((v, k) => cred[k] = v);
+          _fetch('/auth/username', cred)
+          .then(user => {
+            location.href = '/reauth';
+          }).catch(e => {
+            alert(e.error);
+          });        
+        });
+      </script>
     </main>
   </body>
 </html>
