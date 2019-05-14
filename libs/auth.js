@@ -222,7 +222,7 @@ router.post('/removeKey', csrfCheck, sessionCheck, (req, res) => {
 
   const newCreds = user.credentials.filter(cred => {
     // Leave credential ids that do not match
-    return cred.id !== credId;
+    return cred.credId !== credId;
   });
 
   db.get('users')
@@ -276,10 +276,8 @@ router.post('/registerRequest', csrfCheck, sessionCheck, async (req, res) => {
   const user = db.get('users')
     .find({ username: username })
     .value();
-  
   try {
     const response = await f2l.attestationOptions();
-    
     response.user = {
       displayName: 'No name',
       id: user.id,
@@ -288,7 +286,6 @@ router.post('/registerRequest', csrfCheck, sessionCheck, async (req, res) => {
     response.challenge = coerceToBase64Url(response.challenge);
     res.cookie('challenge', response.challenge);
     response.excludeCredentials = [];
-
     if (user.credentials.length > 0) {
       for (let cred of user.credentials) {
         response.excludeCredentials.push({
@@ -298,7 +295,6 @@ router.post('/registerRequest', csrfCheck, sessionCheck, async (req, res) => {
         });
       }
     }
-
     const as = {}; // authenticatorSelection
     const aa = req.body.authenticatorSelection.authenticatorAttachment;
     const rr = req.body.authenticatorSelection.requireResidentKey;

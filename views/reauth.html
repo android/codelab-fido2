@@ -10,20 +10,27 @@
 
     <!-- import the webpage's stylesheet -->
     <link rel="stylesheet" href="/style.css">
+    <link rel="stylesheet" href="https://unpkg.com/material-components-web@latest/dist/material-components-web.min.css">
     <script src="/base64url-arraybuffer.js"></script>
   </head>
-  <body>
-    <header>
-      <h1>
+  <body class="mdc-typography">
+    <header class="mdc-top-app-bar" style="top:0px">
+      <h1 class="mdc-top-app-bar__title">
         WebAuthn codelab
       </h1>
     </header>
-
-    <main>
-      <form id="form" method="POST" action="/auth/signin" >
+    <main class="content mdc-top-app-bar--fixed-adjust">
+      <h2>
+        Enter ignored password
+      </h2>
+      <form id="form" method="POST" action="/auth/password" >
         <input type="hidden" name="username" value="{{username}}" />
-        password (this will be ignored): <input type="password" name="password" value="" />
-        <input type="submit" value="Sign-In" />
+        <div  class="mdc-text-field">
+          <input type="password" class="mdc-text-field__input" name="password" />
+          <div class="mdc-line-ripple"></div>
+          <label class="mdc-floating-label">password</label>
+        </div>
+        <input type="submit" class="mdc-button mdc-button--raised" value="Sign-In" />
       </form>
     </main>
     <script type="module">
@@ -34,13 +41,11 @@
         const form = new FormData(e.target);
         const cred = {};
         form.forEach((v, k) => cred[k] = v);
-        _fetch('/auth/password', cred)
+        _fetch(e.target.action, cred)
         .then(user => {
           location.href = '/home';
         })
-        .catch(e => {
-          alert(e.error);
-        });        
+        .catch(e => alert(e));
       });
 
       verifyAssertion({}).then(user => {
@@ -48,7 +53,8 @@
           location.href = '/home';
         }
       }).catch(e => {
-        alert(e);
+        console.error(e);
+        alert('Authentication failed. Use password to sign-in.');
       });
     </script>
   </body>
