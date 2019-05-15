@@ -24,12 +24,10 @@ export const _fetch = async (path, payload = '') => {
 
 export const registerCredential = async (opts) => {
   if (!window.PublicKeyCredential) {
-    console.info();
     throw 'WebAuthn not supported on this browser.';
   }
   const UVPAA = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
   if (!UVPAA) {
-    console.info();
     throw 'User Verifying Platform Authenticator not available.';
   }
 
@@ -67,18 +65,18 @@ export const registerCredential = async (opts) => {
   return await _fetch('/auth/registerResponse' , credential);
 };
 
-export const verifyAssertion = async (opts) => {
+export const authenticate = async (opts) => {
   if (!window.PublicKeyCredential) {
     console.info('WebAuthn not supported on this browser.');
-    return null;
+    return Promise.resolve(null)
   }
   const UVPAA = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
   if (!UVPAA) {
     console.info('User Verifying Platform Authenticator not available.');
-    return null;
+    return Promise.resolve(null);
   }
 
-  const options = await _fetch('/auth/signinRequest');
+  const options = await _fetch('/auth/signinRequest', opts);
 
   options.challenge = base64url.decode(options.challenge);
 
