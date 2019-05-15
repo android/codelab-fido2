@@ -301,7 +301,7 @@ router.post('/registerResponse', csrfCheck, sessionCheck, async (req, res) => {
     const credential = {
       credId: coerceToBase64Url(regResult.authnrData.get("credId"), 'credId'),
       publicKey: regResult.authnrData.get("credentialPublicKeyPem"),
-      aaguid: regResult.authnrData.get("aaguid"),
+      aaguid: coerceToBase64Url(regResult.authnrData.get("aaguid"), 'aaguid'),
       prevCounter: regResult.authnrData.get("counter")
     };
 
@@ -351,6 +351,8 @@ router.post('/signinRequest', csrfCheck, async (req, res) => {
       res.json({error: 'User not found.'});
       return;
     }
+    
+    const credId = req.query.credId;
 
     const response = await f2l.assertionOptions();
 
@@ -361,12 +363,16 @@ router.post('/signinRequest', csrfCheck, async (req, res) => {
 
     response.allowCredentials = [];
 
-    for (let cred of user.credentials) {
-      response.allowCredentials.push({
-        id: cred.credId,
-        type: 'public-key',
-        transports: ['internal']
-      });
+    if (credId) {
+      for (let cred of user.credentials) {
+        if (cred.credId == credId) {
+          response.allowCredentials.push({
+            id: cred.credId,
+            type: 'public-key',
+            transports: ['internal']
+          });
+        }
+      }
     }
 
     res.json(response);

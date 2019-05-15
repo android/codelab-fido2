@@ -61,6 +61,8 @@ export const registerCredential = async (opts) => {
       attestationObject
     };
   }
+  
+  localStorage.setItem(`credId`, credential.id);
 
   return await _fetch('/auth/registerResponse' , credential);
 };
@@ -76,7 +78,13 @@ export const authenticate = async (opts) => {
     return Promise.resolve(null);
   }
 
-  const options = await _fetch('/auth/signinRequest', opts);
+  let url = '/auth/signinRequest';
+  const credId = localStorage.getItem(`credId`);
+  if (credId) {
+    url += `?credId=${encodeURIComponent(credId)}`;
+  }
+
+  const options = await _fetch(url, opts);
 
   options.challenge = base64url.decode(options.challenge);
 
@@ -109,6 +117,8 @@ export const authenticate = async (opts) => {
       userHandle
     };
   }
+  
+  localStorage.setItem(`credId`, credential.id);
 
   return await _fetch(`/auth/signinResponse`, credential);
 };
