@@ -18,7 +18,7 @@ app.use(express.static('public'));
 app.use((req, res, next) => {
   if (req.get('x-forwarded-proto') &&
      (req.get('x-forwarded-proto')).split(',')[0] !== 'https') {
-    return res.redirect(301, `https://${req.headers.host}${req.url}`);
+    return res.redirect(301, `https://${process.env.HOSTNAME}`);
   }
   req.schema = 'https';
   next();
@@ -60,8 +60,24 @@ app.get('/reauth', (req, res) => {
 });
 
 app.get('/.well-known/assetlinks.json', (req, res) => {
-  res.setHeader('Content-Type', 'application/json');
-  res.sendFile(`${__dirname}/views/assetlinks.json`);
+  const assetlinks = [];
+  const relation = ['delegate_permission/common.handle_all_urls', 'delegate_permission/common.get_login_creds'];
+  assetlinks.push({
+    relation: relation,
+    target: {
+      namespace: 'web',
+      site: `https://${process.env.HOSTNAME}`
+    }
+  });
+  assetlinks.push({
+    relation: relation,
+    target: {
+      namespace: 'android_app',
+      package_name: process.env.ANDROID_PACKAGENAME,
+      sha256_cert_fingerprints: [process.env.ANDROID_SHA256HASH]
+    }
+  });
+  res.json(assetlinks);
 });
 
 app.use('/auth', auth);
