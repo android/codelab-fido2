@@ -67,7 +67,10 @@ class AuthFragment : Fragment() {
             val a = activity
             if (intent.hasPendingIntent() && a != null) {
                 try {
-                    intent.launchPendingIntent(a, MainActivity.REQUEST_FIDO2_SIGNIN)
+
+                    // TODO(5): Open the fingerprint dialog.
+                    // - Open the fingerprint dialog by launching the intent from FIDO2 API.
+
                 } catch (e: IntentSender.SendIntentException) {
                     Log.e(TAG, "Error launching pending intent for signin request", e)
                 }
