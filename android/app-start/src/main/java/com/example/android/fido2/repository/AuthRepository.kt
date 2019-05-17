@@ -45,7 +45,6 @@ import java.util.concurrent.Executors
 class AuthRepository(
     private val api: AuthApi,
     private val prefs: SharedPreferences,
-    private val fido2ApiClient: Fido2ApiClient,
     private val executor: Executor
 ) {
 
@@ -66,11 +65,16 @@ class AuthRepository(
                 instance ?: AuthRepository(
                     AuthApi(),
                     context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE),
-                    Fido.getFido2ApiClient(context),
                     Executors.newFixedThreadPool(64)
                 ).also { instance = it }
             }
         }
+    }
+
+    private var fido2ApiClient: Fido2ApiClient? = null
+
+    fun setFido2APiClient(client: Fido2ApiClient?) {
+        fido2ApiClient = client
     }
 
     private val signInStateListeners = mutableListOf<(SignInState) -> Unit>()
@@ -226,25 +230,29 @@ class AuthRepository(
      * Starts to register a new credential to the server. This should be called only when the
      * sign-in state is [SignInState.SignedIn].
      */
+
     fun registerRequest(processing: MutableLiveData<Boolean>): LiveData<Fido2PendingIntent> {
         val result = MutableLiveData<Fido2PendingIntent>()
         executor.execute {
-            processing.postValue(true)
-            try {
-                val token = prefs.getString(PREF_TOKEN, null)!!
 
-                // TODO(1): Call the server API: /registerRequest
-                // - Use api.registerRequest to get a PublicKeyCredentialCreationOptions.
-                // - Save the challenge for later use in registerResponse.
-                // - Call fido2ApiClient.getRegisterIntent and create an intent to generate a new
-                //   credential.
-                // - Pass the intent back to the `result` LiveData so that the UI can open the
-                //   fingerprint dialog.
+            fido2ApiClient?.let { client ->
+                processing.postValue(true)
+                try {
+                    val token = prefs.getString(PREF_TOKEN, null)!!
 
-            } catch (e: Exception) {
-                Log.e(TAG, "Cannot call registerRequest", e)
-            } finally {
-                processing.postValue(false)
+                    // TODO(1): Call the server API: /registerRequest
+                    // - Use api.registerRequest to get a PublicKeyCredentialCreationOptions.
+                    // - Save the challenge for later use in registerResponse.
+                    // - Call fido2ApiClient.getRegisterIntent and create an intent to generate a
+                    //   new credential.
+                    // - Pass the intent back to the `result` LiveData so that the UI can open the
+                    //   fingerprint dialog.
+
+                } catch (e: Exception) {
+                    Log.e(TAG, "Cannot call registerRequest", e)
+                } finally {
+                    processing.postValue(false)
+                }
             }
         }
         return result
@@ -304,22 +312,23 @@ class AuthRepository(
     fun signinRequest(processing: MutableLiveData<Boolean>): LiveData<Fido2PendingIntent> {
         val result = MutableLiveData<Fido2PendingIntent>()
         executor.execute {
-            processing.postValue(true)
-            try {
+            fido2ApiClient?.let { client ->
+                processing.postValue(true)
+                try {
+                    val username = prefs.getString(PREF_USERNAME, null)!!
+                    val credentialId = prefs.getString(PREF_LOCAL_CREDENTIAL_ID, null)
 
-                val username = prefs.getString(PREF_USERNAME, null)!!
-                val credentialId = prefs.getString(PREF_LOCAL_CREDENTIAL_ID, null)
+                    // TODO(4): Call the server API: /signinRequest
+                    // - Use api.signinRequest to get a PublicKeyCredentialRequestOptions.
+                    // - Save the challenge for later use in signinResponse.
+                    // - Call fido2ApiClient.getSignIntent and create an intent to assert the
+                    //   credential.
+                    // - Pass the intent to the `result` LiveData so that the UI can open the
+                    //   fingerprint dialog.
 
-                // TODO(4): Call the server API: /signinRequest
-                // - Use api.signinRequest to get a PublicKeyCredentialRequestOptions.
-                // - Save the challenge for later use in signinResponse.
-                // - Call fido2ApiClient.getSignIntent and create an intent to assert the
-                //   credential.
-                // - Pass the intent to the `result` LiveData so that the UI can open the
-                //   fingerprint dialog.
-
-            } finally {
-                processing.postValue(false)
+                } finally {
+                    processing.postValue(false)
+                }
             }
         }
         return result

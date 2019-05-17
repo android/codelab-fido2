@@ -19,11 +19,16 @@ package com.example.android.fido2
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import com.example.android.fido2.repository.AuthRepository
+import com.google.android.gms.fido.fido2.Fido2ApiClient
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repository = AuthRepository.getInstance(application)
 
     val signInState = repository.getSignInState()
+
+    fun setFido2ApiClient(client: Fido2ApiClient?) {
+        repository.setFido2APiClient(client)
+    }
 
 }

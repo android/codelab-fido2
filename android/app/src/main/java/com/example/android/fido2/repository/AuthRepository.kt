@@ -45,7 +45,6 @@ import java.util.concurrent.Executors
 class AuthRepository(
     private val api: AuthApi,
     private val prefs: SharedPreferences,
-    private val fido2ApiClient: Fido2ApiClient,
     private val executor: Executor
 ) {
 
@@ -66,11 +65,16 @@ class AuthRepository(
                 instance ?: AuthRepository(
                     AuthApi(),
                     context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE),
-                    Fido.getFido2ApiClient(context),
                     Executors.newFixedThreadPool(64)
                 ).also { instance = it }
             }
         }
+    }
+
+    private var fido2ApiClient: Fido2ApiClient? = null
+
+    fun setFido2APiClient(client: Fido2ApiClient?) {
+        fido2ApiClient = client
     }
 
     private val signInStateListeners = mutableListOf<(SignInState) -> Unit>()
@@ -229,17 +233,19 @@ class AuthRepository(
     fun registerRequest(processing: MutableLiveData<Boolean>): LiveData<Fido2PendingIntent> {
         val result = MutableLiveData<Fido2PendingIntent>()
         executor.execute {
-            processing.postValue(true)
-            try {
-                val token = prefs.getString(PREF_TOKEN, null)!!
-                val (options, challenge) = api.registerRequest(token)
-                lastKnownChallenge = challenge
-                val task: Task<Fido2PendingIntent> = fido2ApiClient.getRegisterIntent(options)
-                result.postValue(Tasks.await(task))
-            } catch (e: Exception) {
-                Log.e(TAG, "Cannot call registerRequest", e)
-            } finally {
-                processing.postValue(false)
+            fido2ApiClient?.let { client ->
+                processing.postValue(true)
+                try {
+                    val token = prefs.getString(PREF_TOKEN, null)!!
+                    val (options, challenge) = api.registerRequest(token)
+                    lastKnownChallenge = challenge
+                    val task: Task<Fido2PendingIntent> = client.getRegisterIntent(options)
+                    result.postValue(Tasks.await(task))
+                } catch (e: Exception) {
+                    Log.e(TAG, "Cannot call registerRequest", e)
+                } finally {
+                    processing.postValue(false)
+                }
             }
         }
         return result
@@ -297,16 +303,18 @@ class AuthRepository(
     fun signinRequest(processing: MutableLiveData<Boolean>): LiveData<Fido2PendingIntent> {
         val result = MutableLiveData<Fido2PendingIntent>()
         executor.execute {
-            processing.postValue(true)
-            try {
-                val username = prefs.getString(PREF_USERNAME, null)!!
-                val credentialId = prefs.getString(PREF_LOCAL_CREDENTIAL_ID, null)
-                val (options, challenge) = api.signinRequest(username, credentialId)
-                lastKnownChallenge = challenge
-                val task = fido2ApiClient.getSignIntent(options)
-                result.postValue(Tasks.await(task))
-            } finally {
-                processing.postValue(false)
+            fido2ApiClient?.let { client ->
+                processing.postValue(true)
+                try {
+                    val username = prefs.getString(PREF_USERNAME, null)!!
+                    val credentialId = prefs.getString(PREF_LOCAL_CREDENTIAL_ID, null)
+                    val (options, challenge) = api.signinRequest(username, credentialId)
+                    lastKnownChallenge = challenge
+                    val task = client.getSignIntent(options)
+                    result.postValue(Tasks.await(task))
+                } finally {
+                    processing.postValue(false)
+                }
             }
         }
         return result

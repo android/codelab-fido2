@@ -63,7 +63,7 @@ class AuthFragment : Fragment() {
 
     override fun onActivityCreated(savedInstanceState: Bundle?) {
         super.onActivityCreated(savedInstanceState)
-        viewModel.signinIntent.observeOnce(requireActivity()) { intent ->
+        viewModel.signinIntent.observeOnce(this) { intent ->
             val a = activity
             if (intent.hasPendingIntent() && a != null) {
                 try {

@@ -99,6 +99,16 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        viewModel.setFido2ApiClient(Fido.getFido2ApiClient(this))
+    }
+
+    override fun onPause() {
+        super.onPause()
+        viewModel.setFido2ApiClient(null)
+    }
+
     private fun showFragment(clazz: Class<out Fragment>, create: () -> Fragment) {
         val manager = supportFragmentManager
         if (!clazz.isInstance(manager.findFragmentById(R.id.container))) {
