@@ -29,6 +29,7 @@
     <string name="welcome">Welcome, %s!</string>
     <string name="auth_explanation">For the purpose of demonstration, the password you type is ignored.</string>
     <string name="password">Password</string>
+    <string name="cancelled">Cancelled</string>
 
     <!-- Home -->
     <string name="credentials_caption">Your registered credentials:</string>

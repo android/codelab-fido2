@@ -71,6 +71,8 @@ class MainActivity : AppCompatActivity() {
                     val error = AuthenticatorErrorResponse.deserializeFromBytes(errorExtra)
                     Toast.makeText(this, error.errorMessage, Toast.LENGTH_LONG).show()
                     Log.e(TAG, error.errorMessage)
+                } else if (resultCode != RESULT_OK) {
+                    Toast.makeText(this, R.string.cancelled, Toast.LENGTH_SHORT).show()
                 } else {
                     val fragment = supportFragmentManager.findFragmentById(R.id.container)
                     if (data != null && fragment is HomeFragment) {
@@ -84,6 +86,8 @@ class MainActivity : AppCompatActivity() {
                     val error = AuthenticatorErrorResponse.deserializeFromBytes(errorExtra)
                     Toast.makeText(this, error.errorMessage, Toast.LENGTH_LONG).show()
                     Log.e(TAG, error.errorMessage)
+                } else if (resultCode != RESULT_OK) {
+                    Toast.makeText(this, R.string.cancelled, Toast.LENGTH_SHORT).show()
                 } else {
                     val fragment = supportFragmentManager.findFragmentById(R.id.container)
                     if (data != null && fragment is AuthFragment) {
