@@ -40,7 +40,7 @@
       </h2>
       <form id="form" method="POST" action="/auth/password" >
         <input type="hidden" name="username" value="{{username}}" />
-        <div  class="mdc-text-field">
+        <div class="mdc-text-field">
           <input type="password" class="mdc-text-field__input" name="password" />
           <div class="mdc-line-ripple"></div>
           <label class="mdc-floating-label">password</label>
@@ -48,7 +48,9 @@
         <input type="submit" class="mdc-button mdc-button--raised" value="Sign-In" />
       </form>
     </main>
+    <script src="https://unpkg.com/material-components-web@latest/dist/material-components-web.min.js"></script>
     <script type="module">
+      new mdc.textField.MDCTextField(document.querySelector('.mdc-text-field'));
       import { _fetch, authenticate } from '/client.js';
       const form = document.querySelector('#form');
       form.addEventListener('submit', e => {

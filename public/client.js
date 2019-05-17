@@ -77,7 +77,7 @@ export const registerCredential = async (opts) => {
       attestationObject
     };
   }
-  
+
   localStorage.setItem(`credId`, credential.id);
 
   return await _fetch('/auth/registerResponse' , credential);
@@ -133,12 +133,8 @@ export const authenticate = async (opts) => {
       userHandle
     };
   }
-  
+
   localStorage.setItem(`credId`, credential.id);
 
   return await _fetch(`/auth/signinResponse`, credential);
-};
-
-export const unregisterCredential = async (credId) => {
-  return _fetch(`/auth/removeKey?credId=${encodeURIComponent(credId)}`);
 };
