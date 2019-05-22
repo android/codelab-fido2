@@ -113,7 +113,7 @@ router.post('/password', (req, res) => {
   const user = db.get('users')
     .find({ username: req.cookies.username })
     .value();
-  
+
   if (!user) {
     res.status(401).json({error: 'Enter username first.'});
     return;
@@ -139,7 +139,7 @@ router.get('/signout', (req, res) => {
  *   username: String,
  *   credentials: [Credential]
  * }```
- 
+
  Credential
  ```
  {
@@ -369,13 +369,13 @@ router.post('/signinRequest', csrfCheck, async (req, res) => {
     const user = db.get('users')
       .find({ username: req.cookies.username })
       .value();
-    
+
     if (!user) {
       // Send empty response if user is not registered yet.
       res.json({error: 'User not found.'});
       return;
     }
-    
+
     const credId = req.query.credId;
 
     const response = await f2l.assertionOptions();
@@ -385,16 +385,18 @@ router.post('/signinRequest', csrfCheck, async (req, res) => {
     response.challenge = coerceToBase64Url(response.challenge, 'challenge');
     res.cookie('challenge', response.challenge);
 
-    response.allowCredentials = [];
-
-    if (credId) {
-      for (let cred of user.credentials) {
-        if (cred.credId == credId) {
-          response.allowCredentials.push({
-            id: cred.credId,
-            type: 'public-key',
-            transports: ['internal']
-          });
+    // Leave `allowCredentials` empty unless there's registered credentials
+    if (user.credentials.length > 0) {
+      response.allowCredentials = [];
+      if (credId) {
+        for (let cred of user.credentials) {
+          if (cred.credId == credId) {
+            response.allowCredentials.push({
+              id: cred.credId,
+              type: 'public-key',
+              transports: ['internal']
+            });
+          }
         }
       }
     }
@@ -440,7 +442,7 @@ router.post('/signinResponse', csrfCheck, async (req, res) => {
 
     const challenge = coerceToArrayBuffer(req.cookies.challenge, 'challenge');
     const origin = `https://${req.get('host')}`; // TODO: Temporary work around for scheme
-    
+
     const clientAssertionResponse = { response: {} };
     clientAssertionResponse.rawId =
       coerceToArrayBuffer(req.body.rawId, "rawId");
