@@ -29,7 +29,20 @@
         android:background="?attr/colorPrimary"
         android:elevation="4dp"
         android:theme="@style/ThemeOverlay.MaterialComponents.Dark.ActionBar"
-        tools:targetApi="21" />
+        tools:targetApi="21">
+
+        <TextView
+            android:id="@+id/host"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:layout_gravity="end"
+            android:gravity="center_vertical"
+            android:padding="@dimen/spacing_medium"
+            android:text="@string/host"
+            android:textAppearance="?attr/textAppearanceSubtitle2"
+            android:textColor="@android:color/white" />
+
+    </androidx.appcompat.widget.Toolbar>
 
     <FrameLayout
         android:id="@+id/container"
