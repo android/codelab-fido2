@@ -29,6 +29,7 @@ android {
         testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
         vectorDrawables.useSupportLibrary = true
         buildConfigField 'String', 'API_BASE_URL', "\"${getProperty('host')}/auth\""
+        resValue 'string', 'host', getProperty('host')
         resValue 'string', 'asset_statements', """
            [{
              "include": "${getProperty('host')}/.well-known/assetlinks.json"

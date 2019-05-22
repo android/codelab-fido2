@@ -19,4 +19,5 @@
     <dimen name="spacing_medium">16dp</dimen>
     <dimen name="spacing_medium_large">24dp</dimen>
     <dimen name="spacing_large">32dp</dimen>
+    <dimen name="dodge_app_bar">64dp</dimen>
 </resources>

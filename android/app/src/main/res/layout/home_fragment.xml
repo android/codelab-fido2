@@ -67,11 +67,12 @@
                 android:layout_height="0dp"
                 android:clipToPadding="false"
                 android:paddingTop="@dimen/spacing_medium"
-                android:paddingBottom="@dimen/spacing_medium"
+                android:paddingBottom="@dimen/dodge_app_bar"
                 app:layout_constraintBottom_toBottomOf="parent"
                 app:layout_constraintEnd_toEndOf="parent"
                 app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintTop_toBottomOf="@id/credentials_caption" />
+                app:layout_constraintTop_toBottomOf="@id/credentials_caption"
+                tools:listitem="@layout/credential_item" />
 
             <TextView
                 android:id="@+id/empty_credentials"
