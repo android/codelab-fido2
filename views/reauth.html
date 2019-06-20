@@ -62,7 +62,7 @@
         .then(user => {
           location.href = '/home';
         })
-        .catch(e => alert(e));
+        .catch(e => alert(e.message || e));
       });
 
       authenticate({}).then(user => {
