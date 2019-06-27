@@ -38,7 +38,6 @@ sealed class SignInState {
      * The user sign-in failed.
      */
     data class SignInError(
-        val username: String,
         val error: String
     ) : SignInState()
 

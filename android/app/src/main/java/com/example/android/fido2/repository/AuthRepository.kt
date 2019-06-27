@@ -167,7 +167,7 @@ class AuthRepository(
                 }
 
                 invokeSignInStateListeners(
-                    SignInState.SignInError(username, e.message ?: "Invalid login credentials" ))
+                    SignInState.SignInError(e.message ?: "Invalid login credentials" ))
             } finally {
                 processing.postValue(false)
             }
