@@ -56,6 +56,11 @@ class MainActivity : AppCompatActivity() {
                 is SignInState.SigningIn -> {
                     showFragment(AuthFragment::class.java) { AuthFragment() }
                 }
+                is SignInState.SignInError -> {
+                    Toast.makeText(this, state.error, Toast.LENGTH_LONG).show()
+                    // return to username prompt
+                    showFragment(UsernameFragment::class.java) { UsernameFragment() }
+                }
                 is SignInState.SignedIn -> {
                     showFragment(HomeFragment::class.java) { HomeFragment() }
                 }

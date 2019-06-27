@@ -151,11 +151,23 @@ class AuthRepository(
     fun password(password: String, processing: MutableLiveData<Boolean>) {
         executor.execute {
             processing.postValue(true)
+            val username = prefs.getString(PREF_USERNAME, null)!!
             try {
-                val username = prefs.getString(PREF_USERNAME, null)!!
                 val token = api.password(username, password)
                 prefs.edit(commit = true) { putString(PREF_TOKEN, token) }
                 invokeSignInStateListeners(SignInState.SignedIn(username, token))
+            } catch (e: ApiException) {
+                Log.e(TAG, "Invalid login credentials", e)
+
+                // start login over again
+                prefs.edit(commit = true) {
+                    remove(PREF_USERNAME)
+                    remove(PREF_TOKEN)
+                    remove(PREF_CREDENTIALS)
+                }
+
+                invokeSignInStateListeners(
+                    SignInState.SignInError(e.message ?: "Invalid login credentials" ))
             } finally {
                 processing.postValue(false)
             }

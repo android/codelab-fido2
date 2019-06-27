@@ -35,11 +35,17 @@ sealed class SignInState {
     ) : SignInState()
 
     /**
+     * The user sign-in failed.
+     */
+    data class SignInError(
+        val error: String
+    ) : SignInState()
+
+    /**
      * The user is signed in.
      */
     data class SignedIn(
         val username: String,
         val token: String
     ) : SignInState()
-
 }
