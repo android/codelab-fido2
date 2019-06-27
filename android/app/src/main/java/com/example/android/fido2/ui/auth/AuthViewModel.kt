@@ -54,6 +54,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         Transformations.map(repository.getSignInState()) { state ->
             when (state) {
                 is SignInState.SigningIn -> state.username
+                is SignInState.SignInError -> state.username
                 is SignInState.SignedIn -> state.username
                 else -> "(user)"
             }
