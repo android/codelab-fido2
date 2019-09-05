@@ -274,7 +274,7 @@ class AuthRepository(
                 val token = prefs.getString(PREF_TOKEN, null)!!
                 val challenge = lastKnownChallenge!!
                 val response = AuthenticatorAttestationResponse.deserializeFromBytes(
-                    data.getByteArrayExtra(Fido.FIDO2_KEY_RESPONSE_EXTRA)
+                    data.getByteArrayExtra(Fido.FIDO2_KEY_RESPONSE_EXTRA)!!
                 )
                 val credentialId = response.keyHandle.toBase64()
                 val credentials = api.registerResponse(token, challenge, response)

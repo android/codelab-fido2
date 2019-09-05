@@ -20,11 +20,11 @@ import android.content.Intent
 import android.os.Bundle
 import android.util.Log
 import android.widget.Toast
+import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.fragment.app.Fragment
-import androidx.fragment.app.transaction
-import androidx.lifecycle.Observer
-import androidx.lifecycle.ViewModelProviders
+import androidx.fragment.app.commit
+import androidx.lifecycle.observe
 import com.example.android.fido2.repository.SignInState
 import com.example.android.fido2.ui.auth.AuthFragment
 import com.example.android.fido2.ui.home.HomeFragment
@@ -40,15 +40,14 @@ class MainActivity : AppCompatActivity() {
         const val REQUEST_FIDO2_SIGNIN = 2
     }
 
-    private lateinit var viewModel: MainViewModel
+    private val viewModel: MainViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        viewModel = ViewModelProviders.of(this).get(MainViewModel::class.java)
         setContentView(R.layout.main_activity)
         setSupportActionBar(findViewById(R.id.toolbar))
 
-        viewModel.signInState.observe(this, Observer { state ->
+        viewModel.signInState.observe(this) { state ->
             when (state) {
                 is SignInState.SignedOut -> {
                     showFragment(UsernameFragment::class.java) { UsernameFragment() }
@@ -65,7 +64,7 @@ class MainActivity : AppCompatActivity() {
                     showFragment(HomeFragment::class.java) { HomeFragment() }
                 }
             }
-        })
+        }
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
@@ -74,8 +73,10 @@ class MainActivity : AppCompatActivity() {
                 val errorExtra = data?.getByteArrayExtra(Fido.FIDO2_KEY_ERROR_EXTRA)
                 if (errorExtra != null) {
                     val error = AuthenticatorErrorResponse.deserializeFromBytes(errorExtra)
-                    Toast.makeText(this, error.errorMessage, Toast.LENGTH_LONG).show()
-                    Log.e(TAG, error.errorMessage)
+                    error.errorMessage?.let { errorMessage ->
+                        Toast.makeText(this, errorMessage, Toast.LENGTH_LONG).show()
+                        Log.e(TAG, errorMessage)
+                    }
                 } else if (resultCode != RESULT_OK) {
                     Toast.makeText(this, R.string.cancelled, Toast.LENGTH_SHORT).show()
                 } else {
@@ -89,8 +90,10 @@ class MainActivity : AppCompatActivity() {
                 val errorExtra = data?.getByteArrayExtra(Fido.FIDO2_KEY_ERROR_EXTRA)
                 if (errorExtra != null) {
                     val error = AuthenticatorErrorResponse.deserializeFromBytes(errorExtra)
-                    Toast.makeText(this, error.errorMessage, Toast.LENGTH_LONG).show()
-                    Log.e(TAG, error.errorMessage)
+                    error.errorMessage?.let { errorMessage ->
+                        Toast.makeText(this, errorMessage, Toast.LENGTH_LONG).show()
+                        Log.e(TAG, errorMessage)
+                    }
                 } else if (resultCode != RESULT_OK) {
                     Toast.makeText(this, R.string.cancelled, Toast.LENGTH_SHORT).show()
                 } else {
@@ -117,7 +120,7 @@ class MainActivity : AppCompatActivity() {
     private fun showFragment(clazz: Class<out Fragment>, create: () -> Fragment) {
         val manager = supportFragmentManager
         if (!clazz.isInstance(manager.findFragmentById(R.id.container))) {
-            manager.transaction {
+            manager.commit {
                 replace(R.id.container, create())
             }
         }
