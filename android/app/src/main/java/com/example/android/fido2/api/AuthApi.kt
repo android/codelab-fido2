@@ -553,11 +553,11 @@ class AuthApi {
      * Looks for a set-cookie header with a particular name
      */
     private fun findSetCookieInResponse(response: Response, cname: String): String {
-        for (i in response.headers("set-cookie")) {
-            if (i.indexOf(cname + "=") == 0) {
-                return i
+        for (header in response.headers("set-cookie")) {
+            if (header.startsWith("$cname=")) {
+                return header
             }
         }
-        throw ApiException("Cookie not found: " + cname);
+        throw ApiException("Cookie not found: $cname");
     }
 }

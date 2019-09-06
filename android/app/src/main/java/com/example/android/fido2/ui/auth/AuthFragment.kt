@@ -24,8 +24,8 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.fragment.app.Fragment
-import androidx.lifecycle.Observer
-import androidx.lifecycle.ViewModelProviders
+import androidx.fragment.app.viewModels
+import androidx.lifecycle.observe
 import com.example.android.fido2.MainActivity
 import com.example.android.fido2.databinding.AuthFragmentBinding
 import com.example.android.fido2.ui.observeOnce
@@ -36,7 +36,7 @@ class AuthFragment : Fragment() {
         private const val TAG = "AuthFragment"
     }
 
-    private lateinit var viewModel: AuthViewModel
+    private val viewModel: AuthViewModel by viewModels()
     private lateinit var binding: AuthFragmentBinding
 
     override fun onCreateView(
@@ -44,7 +44,6 @@ class AuthFragment : Fragment() {
         container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View? {
-        viewModel = ViewModelProviders.of(this).get(AuthViewModel::class.java)
         binding = AuthFragmentBinding.inflate(inflater, container, false)
         binding.lifecycleOwner = viewLifecycleOwner
         binding.viewModel = viewModel
@@ -52,13 +51,13 @@ class AuthFragment : Fragment() {
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
-        viewModel.processing.observe(viewLifecycleOwner, Observer { processing ->
+        viewModel.processing.observe(viewLifecycleOwner) { processing ->
             if (processing) {
                 binding.processing.show()
             } else {
                 binding.processing.hide()
             }
-        })
+        }
     }
 
     override fun onActivityCreated(savedInstanceState: Bundle?) {

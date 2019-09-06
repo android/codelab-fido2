@@ -77,8 +77,8 @@ class AuthApi {
         if (!response.isSuccessful) {
             throwResponseError(response, "Error calling /username")
         }
-        val cookie = response.header("SET-COOKIE") ?: throw ApiException("Cookie not found")
-        return parseUsername(cookie)
+
+        return parseUsername(findSetCookieInResponse(response, "username"))
     }
 
     /**
@@ -100,7 +100,7 @@ class AuthApi {
         if (!response.isSuccessful) {
             throwResponseError(response, "Error calling /password")
         }
-        val cookie = response.header("SET-COOKIE") ?: throw ApiException("Cookie not found")
+        val cookie = findSetCookieInResponse(response, "signed-in")
         return "$cookie; username=$username"
     }
 
@@ -287,7 +287,7 @@ class AuthApi {
             throwResponseError(apiResponse, "Error calling /signingResponse")
         }
         val body = apiResponse.body() ?: throw ApiException("Empty response from /signinResponse")
-        val cookie = apiResponse.header("SET-COOKIE") ?: throw ApiException("Cookie not found")
+        val cookie = findSetCookieInResponse(apiResponse, "signed-in")
         return parseUserCredentials(body) to "$cookie; username=$username"
     }
 
@@ -549,4 +549,15 @@ class AuthApi {
         endObject()
     }
 
+    /*
+     * Looks for a set-cookie header with a particular name
+     */
+    private fun findSetCookieInResponse(response: Response, cname: String): String {
+        for (header in response.headers("set-cookie")) {
+            if (header.startsWith("$cname=")) {
+                return header
+            }
+        }
+        throw ApiException("Cookie not found: $cname");
+    }
 }

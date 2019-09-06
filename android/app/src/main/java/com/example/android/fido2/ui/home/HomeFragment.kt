@@ -24,8 +24,8 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.fragment.app.Fragment
-import androidx.lifecycle.Observer
-import androidx.lifecycle.ViewModelProviders
+import androidx.fragment.app.viewModels
+import androidx.lifecycle.observe
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.android.fido2.MainActivity
 import com.example.android.fido2.R
@@ -39,14 +39,13 @@ class HomeFragment : Fragment(), DeleteConfirmationFragment.Listener {
         private const val FRAGMENT_DELETE_CONFIRMATION = "delete_confirmation"
     }
 
-    private lateinit var viewModel: HomeViewModel
+    private val viewModel: HomeViewModel by viewModels()
     private lateinit var binding: HomeFragmentBinding
 
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?, savedInstanceState: Bundle?
     ): View? {
-        viewModel = ViewModelProviders.of(this).get(HomeViewModel::class.java)
         binding = HomeFragmentBinding.inflate(inflater, container, false)
         binding.lifecycleOwner = viewLifecycleOwner
         binding.viewModel = viewModel
@@ -62,14 +61,14 @@ class HomeFragment : Fragment(), DeleteConfirmationFragment.Listener {
             layoutManager = LinearLayoutManager(view.context)
             adapter = credentialAdapter
         }
-        viewModel.credentials.observe(viewLifecycleOwner, Observer { credentials ->
+        viewModel.credentials.observe(viewLifecycleOwner) { credentials ->
             credentialAdapter.submitList(credentials)
             binding.emptyCredentials.visibility = if (credentials.isEmpty()) {
                 View.VISIBLE
             } else {
                 View.INVISIBLE
             }
-        })
+        }
 
         // Menu
         binding.appBar.replaceMenu(R.menu.home)
@@ -87,13 +86,13 @@ class HomeFragment : Fragment(), DeleteConfirmationFragment.Listener {
             }
         }
 
-        viewModel.processing.observe(viewLifecycleOwner, Observer { processing ->
+        viewModel.processing.observe(viewLifecycleOwner) { processing ->
             if (processing) {
                 binding.processing.show()
             } else {
                 binding.processing.hide()
             }
-        })
+        }
 
         // FAB
         binding.add.setOnClickListener {
