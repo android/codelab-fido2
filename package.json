@@ -12,23 +12,23 @@
     "hbs": "^4.1.1",
     "cookie-parser": "^1.4.5",
     "lowdb": "^1.0.0",
-    "crypto": "^1.0.1",
-    "fido2-lib": "agektmr/fido2-lib#android-compatible3",
     "@material/mwc-button": "^0.18.0",
     "@material/mwc-fab": "^0.18.0",
     "@material/mwc-top-app-bar-fixed": "^0.18.0",
     "@material/mwc-textfield": "^0.18.0",
-    "webpack": "^4.44.1",
+    "webpack": "^4.44.2",
     "webpack-cli": "^3.3.12",
     "@babel/core": "^7.11.6",
     "babel-loader": "^8.1.0",
-    "babel-preset-env": "^1.7.0"
+    "babel-preset-env": "^1.7.0",
+    "@simplewebauthn/server": "^0.9.1",
+    "base64url": "^3.0.1"
   },
   "engines": {
     "node": "10.x"
   },
   "repository": {
-    "url": "https://glitch.com/edit/#!/hello-express"
+    "url": "https://github.com/googlecodelabs/fido2-codelab"
   },
   "license": "MIT",
   "keywords": [

@@ -17,16 +17,11 @@
 const express = require('express');
 const router = express.Router();
 const crypto = require('crypto');
-const { Fido2Lib } = require('fido2-lib');
-const {
-  coerceToBase64Url,
-  coerceToArrayBuffer,
-} = require('fido2-lib/lib/utils');
+const fido2 = require('@simplewebauthn/server');
+const base64url = require('base64url');
 const fs = require('fs');
 
 const low = require('lowdb');
-
-const HOSTNAME = `${process.env.PROJECT_DOMAIN}.glitch.me`;
 
 if (!fs.existsSync('./.data')) {
   fs.mkdirSync('./.data');
@@ -38,13 +33,8 @@ const db = low(adapter);
 
 router.use(express.json());
 
-const f2l = new Fido2Lib({
-  timeout: 30 * 1000 * 60,
-  rpId: HOSTNAME,
-  rpName: 'WebAuthn Codelab',
-  challengeSize: 32,
-  cryptoParams: [-7],
-});
+const RP_NAME = 'WebAuthn Codelab';
+const TIMEOUT = 30 * 1000 * 60;
 
 const sameSite = {
   sameSite: 'none',
@@ -92,7 +82,7 @@ router.post('/username', (req, res) => {
     if (!user) {
       user = {
         username: username,
-        id: coerceToBase64Url(crypto.randomBytes(32), 'user.id'),
+        id: base64url.encode(crypto.randomBytes(32)),
         credentials: [],
       };
       db.get('users').push(user).write();
@@ -221,29 +211,21 @@ router.post('/registerRequest', csrfCheck, sessionCheck, async (req, res) => {
   const username = req.cookies.username;
   const user = db.get('users').find({ username: username }).value();
   try {
-    const response = await f2l.attestationOptions();
-    response.user = {
-      displayName: 'No name',
-      id: user.id,
-      name: user.username,
-    };
-    response.challenge = coerceToBase64Url(response.challenge, 'challenge');
-    res.cookie('challenge', response.challenge, sameSite);
-    response.excludeCredentials = [];
+    const excludeCredentials = [];
     if (user.credentials.length > 0) {
       for (let cred of user.credentials) {
-        response.excludeCredentials.push({
+        excludeCredentials.push({
           id: cred.credId,
           type: 'public-key',
           transports: ['internal'],
         });
       }
     }
-    response.pubKeyCredParams = [];
+    const pubKeyCredParams = [];
     // const params = [-7, -35, -36, -257, -258, -259, -37, -38, -39, -8];
     const params = [-7, -257];
     for (let param of params) {
-      response.pubKeyCredParams.push({ type: 'public-key', alg: param });
+      pubKeyCredParams.push({ type: 'public-key', alg: param });
     }
     const as = {}; // authenticatorSelection
     const aa = req.body.authenticatorSelection.authenticatorAttachment;
@@ -251,6 +233,8 @@ router.post('/registerRequest', csrfCheck, sessionCheck, async (req, res) => {
     const uv = req.body.authenticatorSelection.userVerification;
     const cp = req.body.attestation; // attestationConveyancePreference
     let asFlag = false;
+    let authenticatorSelection;
+    let attestation = 'none';
 
     if (aa && (aa == 'platform' || aa == 'cross-platform')) {
       asFlag = true;
@@ -265,13 +249,28 @@ router.post('/registerRequest', csrfCheck, sessionCheck, async (req, res) => {
       as.userVerification = uv;
     }
     if (asFlag) {
-      response.authenticatorSelection = as;
+      authenticatorSelection = as;
     }
     if (cp && (cp == 'none' || cp == 'indirect' || cp == 'direct')) {
-      response.attestation = cp;
+      attestation = cp;
     }
 
-    res.json(response);
+    const options = fido2.generateAttestationOptions({
+      rpName: RP_NAME,
+      rpID: process.env.HOSTNAME,
+      userID: user.id,
+      userName: user.username,
+      timeout: TIMEOUT,
+      // Prompt users for additional information about the authenticator.
+      attestationType: attestation,
+      // Prevent users from re-registering existing authenticators
+      excludedCredentialIDs: excludeCredentials,
+      authenticatorSelection,
+    });
+
+    res.cookie('challenge', options.challenge, sameSite);
+
+    res.json(options);
   } catch (e) {
     res.status(400).send({ error: e });
   }
@@ -294,57 +293,57 @@ router.post('/registerRequest', csrfCheck, sessionCheck, async (req, res) => {
  **/
 router.post('/registerResponse', csrfCheck, sessionCheck, async (req, res) => {
   const username = req.cookies.username;
-  const challenge = coerceToArrayBuffer(req.cookies.challenge, 'challenge');
+  const expectedChallenge = req.cookies.challenge;
+  const expectedOrigin = process.env.ORIGIN;
+  const expectedRPID = process.env.HOSTNAME;
   const credId = req.body.id;
   const type = req.body.type;
 
   try {
-    const clientAttestationResponse = { response: {} };
-    clientAttestationResponse.rawId = coerceToArrayBuffer(
-      req.body.rawId,
-      'rawId',
-    );
-    clientAttestationResponse.response.clientDataJSON = coerceToArrayBuffer(
-      req.body.response.clientDataJSON,
-      'clientDataJSON',
-    );
-    clientAttestationResponse.response.attestationObject = coerceToArrayBuffer(
-      req.body.response.attestationObject,
-      'attestationObject',
-    );
+    const { body } = req;
 
     let origin = '';
     if (req.get('User-Agent').indexOf('okhttp') > -1) {
       const octArray = process.env.ANDROID_SHA256HASH.split(':').map((h) =>
         parseInt(h, 16),
       );
-      const androidHash = coerceToBase64Url(octArray, 'Android Hash');
+      const androidHash = base64url.encode(octArray);
       origin = `android:apk-key-hash:${androidHash}`; // TODO: Generate
     } else {
-      origin = `https://${req.get('host')}`;
+      origin = process.env.ORIGIN;
     }
 
-    const attestationExpectations = {
-      challenge: challenge,
-      origin: origin,
-      factor: 'either',
-    };
+    const verification = await fido2.verifyAttestationResponse({
+      credential: body,
+      expectedChallenge,
+      expectedOrigin: origin,
+      expectedRPID: process.env.HOSTNAME,
+    });
 
-    const regResult = await f2l.attestationResult(
-      clientAttestationResponse,
-      attestationExpectations,
-    );
+    const { verified, authenticatorInfo } = verification;
 
-    const credential = {
-      credId: coerceToBase64Url(regResult.authnrData.get('credId'), 'credId'),
-      publicKey: regResult.authnrData.get('credentialPublicKeyPem'),
-      aaguid: coerceToBase64Url(regResult.authnrData.get('aaguid'), 'aaguid'),
-      prevCounter: regResult.authnrData.get('counter'),
-    };
+    if (!verified) {
+      throw 'User verification failed.';
+    }
+
+    const { base64PublicKey, base64CredentialID, counter } = authenticatorInfo;
 
     const user = db.get('users').find({ username: username }).value();
 
-    user.credentials.push(credential);
+    const existingCred = user.credentials.find(
+      (cred) => cred.credID === base64CredentialID,
+    );
+
+    if (!existingCred) {
+      /**
+       * Add the returned device to the user's list of devices
+       */
+      user.credentials.push({
+        publicKey: base64PublicKey,
+        credId: base64CredentialID,
+        prevCounter: counter,
+      });
+    }
 
     db.get('users').find({ username: username }).assign(user).write();
 
@@ -387,26 +386,35 @@ router.post('/signinRequest', csrfCheck, async (req, res) => {
 
     const credId = req.query.credId;
 
-    const response = await f2l.assertionOptions();
-
     // const response = {};
-    response.userVerification = req.body.userVerification || 'required';
-    response.challenge = coerceToBase64Url(response.challenge, 'challenge');
-    res.cookie('challenge', response.challenge, sameSite);
+    const userVerification = req.body.userVerification || 'required';
 
-    response.allowCredentials = [];
+    const allowCredentials = [];
     for (let cred of user.credentials) {
       // When credId is not specified, or matches the one specified
       if (!credId || cred.credId == credId) {
-        response.allowCredentials.push({
-          id: cred.credId,
-          type: 'public-key',
-          transports: ['internal'],
-        });
+        allowCredentials.push(cred.credId);
+        // TODO: Waiting for [this issue](https://github.com/MasterKale/SimpleWebAuthn/issues/57) to be fixed.
+        // allowCredentials.push({
+        //   id: cred.credId,
+        //   type: 'public-key',
+        //   transports: ['internal']
+        // });
       }
     }
 
-    res.json(response);
+    const options = fido2.generateAssertionOptions({
+      timeout: TIMEOUT,
+      allowedCredentialIDs: allowCredentials,
+      /**
+       * This optional value controls whether or not the authenticator needs be able to uniquely
+       * identify the user interacting with it (via built-in PIN pad, fingerprint scanner, etc...)
+       */
+      userVerification,
+    });
+    res.cookie('challenge', options.challenge, sameSite);
+
+    res.json(options);
   } catch (e) {
     res.status(400).json({ error: e });
   }
@@ -428,59 +436,33 @@ router.post('/signinRequest', csrfCheck, async (req, res) => {
  * }```
  **/
 router.post('/signinResponse', csrfCheck, async (req, res) => {
+  const { body } = req;
+  const expectedChallenge = req.cookies.challenge;
   // Query the user
   const user = db.get('users').find({ username: req.cookies.username }).value();
 
-  let credential = null;
-  for (let cred of user.credentials) {
-    if (cred.credId === req.body.id) {
-      credential = cred;
-    }
-  }
+  let credential = user.credentials.find((cred) => cred.credId === body.id);
 
   try {
     if (!credential) {
       throw 'Authenticating credential not found.';
     }
 
-    const challenge = coerceToArrayBuffer(req.cookies.challenge, 'challenge');
-    const origin = `https://${req.get('host')}`; // TODO: Temporary work around for scheme
+    const verification = fido2.verifyAssertionResponse({
+      credential: body,
+      expectedChallenge,
+      expectedOrigin: process.env.ORIGIN,
+      expectedRPID: process.env.HOSTNAME,
+      authenticator: credential,
+    });
 
-    const clientAssertionResponse = { response: {} };
-    clientAssertionResponse.rawId = coerceToArrayBuffer(
-      req.body.rawId,
-      'rawId',
-    );
-    clientAssertionResponse.response.clientDataJSON = coerceToArrayBuffer(
-      req.body.response.clientDataJSON,
-      'clientDataJSON',
-    );
-    clientAssertionResponse.response.authenticatorData = coerceToArrayBuffer(
-      req.body.response.authenticatorData,
-      'authenticatorData',
-    );
-    clientAssertionResponse.response.signature = coerceToArrayBuffer(
-      req.body.response.signature,
-      'signature',
-    );
-    clientAssertionResponse.response.userHandle = coerceToArrayBuffer(
-      req.body.response.userHandle,
-      'userHandle',
-    );
-    const assertionExpectations = {
-      challenge: challenge,
-      origin: origin,
-      factor: 'either',
-      publicKey: credential.publicKey,
-      prevCounter: credential.prevCounter,
-      userHandle: coerceToArrayBuffer(user.id, 'userHandle'),
-    };
-    const result = await f2l.assertionResult(
-      clientAssertionResponse,
-      assertionExpectations,
-    );
+    const { verified, authenticatorInfo } = verification;
 
-    credential.prevCounter = result.authnrData.get('counter');
+    if (!verified) {
+      throw 'User verification failed.';
+    }
+
+    credential.prevCounter = authenticatorInfo.counter;
 
     db.get('users').find({ id: req.cookies.id }).assign(user).write();
 

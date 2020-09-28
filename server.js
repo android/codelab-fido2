@@ -30,17 +30,19 @@ app.use(express.json());
 app.use(express.static('public'));
 app.use(express.static('dist'));
 
-const HOSTNAME = `${process.env.PROJECT_DOMAIN}.glitch.me`;
-const ORIGIN = `https://${HOSTNAME}`;
-console.log(HOSTNAME);
-console.log(ORIGIN);
-
 app.use((req, res, next) => {
+  if (process.env.PROJECT_DOMAIN) {
+    process.env.HOSTNAME = `${process.env.PROJECT_DOMAIN}.glitch.me`;
+  } else {
+    process.env.HOSTNAME = req.headers.host;
+  }
+  const protocol = /^localhost/.test(process.env.HOSTNAME) ? 'http' : 'https';
+  process.env.ORIGIN = `${protocol}://${process.env.HOSTNAME}`;
   if (
     req.get('x-forwarded-proto') &&
     req.get('x-forwarded-proto').split(',')[0] !== 'https'
   ) {
-    return res.redirect(301, ORIGIN);
+    return res.redirect(301, process.env.ORIGIN);
   }
   req.schema = 'https';
   next();
