@@ -1,29 +1,39 @@
 {
-  "name": "fido2-codelab",
+  "name": "webauthn-codelab",
   "version": "0.0.1",
-  "description": "WebAuthn / FIDO2 Codelab for Android and web.",
+  "description": "A simple Node app built on Express, instantly up and running.",
   "main": "server.js",
   "scripts": {
+    "build": "webpack -p",
     "start": "node server.js"
   },
   "dependencies": {
-    "cookie-parser": "^1.4.4",
+    "express": "^4.17.1",
+    "hbs": "^4.1.1",
+    "cookie-parser": "^1.4.5",
+    "lowdb": "^1.0.0",
     "crypto": "^1.0.1",
-    "express": "^4.16.4",
     "fido2-lib": "agektmr/fido2-lib#android-compatible3",
-    "hbs": "^4.0.4",
-    "lowdb": "^1.0.0"
+    "@material/mwc-button": "^0.18.0",
+    "@material/mwc-fab": "^0.18.0",
+    "@material/mwc-top-app-bar-fixed": "^0.18.0",
+    "@material/mwc-textfield": "^0.18.0",
+    "webpack": "^4.44.1",
+    "webpack-cli": "^3.3.12",
+    "@babel/core": "^7.11.6",
+    "babel-loader": "^8.1.0",
+    "babel-preset-env": "^1.7.0"
   },
   "engines": {
-    "node": "8.x"
+    "node": "10.x"
   },
   "repository": {
-    "url": "https://github.com/googlecodelabs/fido2"
+    "url": "https://glitch.com/edit/#!/hello-express"
   },
-  "license": "Apache2",
+  "license": "MIT",
   "keywords": [
-    "fido2",
-    "webauthn",
-    "authentication"
+    "node",
+    "glitch",
+    "express"
   ]
 }

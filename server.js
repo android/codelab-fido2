@@ -28,11 +28,19 @@ app.set('views', './views');
 app.use(cookieParser());
 app.use(express.json());
 app.use(express.static('public'));
+app.use(express.static('dist'));
+
+const HOSTNAME = `${process.env.PROJECT_DOMAIN}.glitch.me`;
+const ORIGIN = `https://${HOSTNAME}`;
+console.log(HOSTNAME);
+console.log(ORIGIN);
 
 app.use((req, res, next) => {
-  if (req.get('x-forwarded-proto') &&
-     (req.get('x-forwarded-proto')).split(',')[0] !== 'https') {
-    return res.redirect(301, `https://${process.env.HOSTNAME}`);
+  if (
+    req.get('x-forwarded-proto') &&
+    req.get('x-forwarded-proto').split(',')[0] !== 'https'
+  ) {
+    return res.redirect(301, ORIGIN);
   }
   req.schema = 'https';
   next();
@@ -51,14 +59,13 @@ app.get('/', (req, res) => {
 });
 
 app.get('/home', (req, res) => {
-  if (!req.cookies.username ||
-      req.cookies['signed-in'] != 'yes') {
+  if (!req.cookies.username || req.cookies['signed-in'] != 'yes') {
     // If user is not signed in, redirect to `/`.
     res.redirect(307, '/');
     return;
   }
   // `home.html` shows sign-out link
-  res.render('home.html', {username: req.cookies.username});
+  res.render('home.html', { username: req.cookies.username });
 });
 
 app.get('/reauth', (req, res) => {
@@ -70,32 +77,30 @@ app.get('/reauth', (req, res) => {
   // Show `reauth.html`.
   // User is supposed to enter a password (which will be ignored)
   // Make XHR POST to `/signin`
-  res.render('reauth.html', {username: username});
+  res.render('reauth.html', { username: username });
 });
 
 app.get('/.well-known/assetlinks.json', (req, res) => {
   const assetlinks = [];
   const relation = [
     'delegate_permission/common.handle_all_urls',
-    'delegate_permission/common.get_login_creds'
+    'delegate_permission/common.get_login_creds',
   ];
-  if (process.env.HOSTNAME) {
-    assetlinks.push({
-      relation: relation,
-      target: {
-        namespace: 'web',
-        site: `https://${process.env.HOSTNAME}`
-      }
-    });
-  }
+  assetlinks.push({
+    relation: relation,
+    target: {
+      namespace: 'web',
+      site: ORIGIN,
+    },
+  });
   if (process.env.ANDROID_PACKAGENAME && process.env.ANDROID_SHA256HASH) {
     assetlinks.push({
       relation: relation,
       target: {
         namespace: 'android_app',
         package_name: process.env.ANDROID_PACKAGENAME,
-        sha256_cert_fingerprints: [process.env.ANDROID_SHA256HASH]
-      }
+        sha256_cert_fingerprints: [process.env.ANDROID_SHA256HASH],
+      },
     });
   }
   res.json(assetlinks);

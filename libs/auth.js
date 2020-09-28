@@ -18,12 +18,15 @@ const express = require('express');
 const router = express.Router();
 const crypto = require('crypto');
 const { Fido2Lib } = require('fido2-lib');
-const { coerceToBase64Url,
-        coerceToArrayBuffer
-      } = require('fido2-lib/lib/utils');
+const {
+  coerceToBase64Url,
+  coerceToArrayBuffer,
+} = require('fido2-lib/lib/utils');
 const fs = require('fs');
 
 const low = require('lowdb');
+
+const HOSTNAME = `${process.env.PROJECT_DOMAIN}.glitch.me`;
 
 if (!fs.existsSync('./.data')) {
   fs.mkdirSync('./.data');
@@ -36,20 +39,25 @@ const db = low(adapter);
 router.use(express.json());
 
 const f2l = new Fido2Lib({
-    timeout: 30*1000*60,
-    rpId: process.env.HOSTNAME,
-    rpName: "WebAuthn Codelab",
-    challengeSize: 32,
-    cryptoParams: [-7]
+  timeout: 30 * 1000 * 60,
+  rpId: HOSTNAME,
+  rpName: 'WebAuthn Codelab',
+  challengeSize: 32,
+  cryptoParams: [-7],
 });
 
+const sameSite = {
+  sameSite: 'none',
+  secure: true,
+};
+
 db.defaults({
-  users: []
+  users: [],
 }).write();
 
 const csrfCheck = (req, res, next) => {
   if (req.header('X-Requested-With') != 'XMLHttpRequest') {
-    res.status(400).json({error: 'invalid access.'});
+    res.status(400).json({ error: 'invalid access.' });
     return;
   }
   next();
@@ -61,7 +69,7 @@ const csrfCheck = (req, res, next) => {
  **/
 const sessionCheck = (req, res, next) => {
   if (!req.cookies['signed-in']) {
-    res.status(401).json({error: 'not signed in.'});
+    res.status(401).json({ error: 'not signed in.' });
     return;
   }
   next();
@@ -79,22 +87,18 @@ router.post('/username', (req, res) => {
     return;
   } else {
     // See if account already exists
-    let user = db.get('users')
-      .find({ username: username })
-      .value();
+    let user = db.get('users').find({ username: username }).value();
     // If user entry is not created yet, create one
     if (!user) {
       user = {
         username: username,
         id: coerceToBase64Url(crypto.randomBytes(32), 'user.id'),
-        credentials: []
-      }
-      db.get('users')
-        .push(user)
-        .write();
+        credentials: [],
+      };
+      db.get('users').push(user).write();
     }
     // Set username cookie
-    res.cookie('username', username);
+    res.cookie('username', username, sameSite);
     // If sign-in succeeded, redirect to `/home`.
     res.json(user);
   }
@@ -107,19 +111,17 @@ router.post('/username', (req, res) => {
  **/
 router.post('/password', (req, res) => {
   if (!req.body.password) {
-    res.status(401).json({error: 'Enter at least one random letter.'});
+    res.status(401).json({ error: 'Enter at least one random letter.' });
     return;
   }
-  const user = db.get('users')
-    .find({ username: req.cookies.username })
-    .value();
+  const user = db.get('users').find({ username: req.cookies.username }).value();
 
   if (!user) {
-    res.status(401).json({error: 'Enter username first.'});
+    res.status(401).json({ error: 'Enter username first.' });
     return;
   }
 
-  res.cookie('signed-in', 'yes');
+  res.cookie('signed-in', 'yes', sameSite);
   res.json(user);
 });
 
@@ -151,9 +153,7 @@ router.get('/signout', (req, res) => {
  ```
  **/
 router.post('/getKeys', csrfCheck, sessionCheck, (req, res) => {
-  const user = db.get('users')
-    .find({ username: req.cookies.username })
-    .value();
+  const user = db.get('users').find({ username: req.cookies.username }).value();
   res.json(user || {});
 });
 
@@ -164,11 +164,9 @@ router.post('/getKeys', csrfCheck, sessionCheck, (req, res) => {
 router.post('/removeKey', csrfCheck, sessionCheck, (req, res) => {
   const credId = req.query.credId;
   const username = req.cookies.username;
-  const user = db.get('users')
-    .find({ username: username })
-    .value();
+  const user = db.get('users').find({ username: username }).value();
 
-  const newCreds = user.credentials.filter(cred => {
+  const newCreds = user.credentials.filter((cred) => {
     // Leave credential ids that do not match
     return cred.credId !== credId;
   });
@@ -221,32 +219,31 @@ router.get('/resetDB', (req, res) => {
  **/
 router.post('/registerRequest', csrfCheck, sessionCheck, async (req, res) => {
   const username = req.cookies.username;
-  const user = db.get('users')
-    .find({ username: username })
-    .value();
+  const user = db.get('users').find({ username: username }).value();
   try {
     const response = await f2l.attestationOptions();
     response.user = {
       displayName: 'No name',
       id: user.id,
-      name: user.username
+      name: user.username,
     };
     response.challenge = coerceToBase64Url(response.challenge, 'challenge');
-    res.cookie('challenge', response.challenge);
+    res.cookie('challenge', response.challenge, sameSite);
     response.excludeCredentials = [];
     if (user.credentials.length > 0) {
       for (let cred of user.credentials) {
         response.excludeCredentials.push({
           id: cred.credId,
           type: 'public-key',
-          transports: ['internal']
+          transports: ['internal'],
         });
       }
     }
     response.pubKeyCredParams = [];
+    // const params = [-7, -35, -36, -257, -258, -259, -37, -38, -39, -8];
     const params = [-7, -257];
     for (let param of params) {
-      response.pubKeyCredParams.push({type:'public-key', alg: param});
+      response.pubKeyCredParams.push({ type: 'public-key', alg: param });
     }
     const as = {}; // authenticatorSelection
     const aa = req.body.authenticatorSelection.authenticatorAttachment;
@@ -303,16 +300,24 @@ router.post('/registerResponse', csrfCheck, sessionCheck, async (req, res) => {
 
   try {
     const clientAttestationResponse = { response: {} };
-    clientAttestationResponse.rawId =
-      coerceToArrayBuffer(req.body.rawId, "rawId");
-    clientAttestationResponse.response.clientDataJSON =
-      coerceToArrayBuffer(req.body.response.clientDataJSON, "clientDataJSON");
-    clientAttestationResponse.response.attestationObject =
-      coerceToArrayBuffer(req.body.response.attestationObject, "attestationObject");
+    clientAttestationResponse.rawId = coerceToArrayBuffer(
+      req.body.rawId,
+      'rawId',
+    );
+    clientAttestationResponse.response.clientDataJSON = coerceToArrayBuffer(
+      req.body.response.clientDataJSON,
+      'clientDataJSON',
+    );
+    clientAttestationResponse.response.attestationObject = coerceToArrayBuffer(
+      req.body.response.attestationObject,
+      'attestationObject',
+    );
 
     let origin = '';
     if (req.get('User-Agent').indexOf('okhttp') > -1) {
-      const octArray = process.env.ANDROID_SHA256HASH.split(':').map(h => parseInt(h, 16));
+      const octArray = process.env.ANDROID_SHA256HASH.split(':').map((h) =>
+        parseInt(h, 16),
+      );
       const androidHash = coerceToBase64Url(octArray, 'Android Hash');
       origin = `android:apk-key-hash:${androidHash}`; // TODO: Generate
     } else {
@@ -322,28 +327,26 @@ router.post('/registerResponse', csrfCheck, sessionCheck, async (req, res) => {
     const attestationExpectations = {
       challenge: challenge,
       origin: origin,
-      factor: "either"
+      factor: 'either',
     };
 
-    const regResult = await f2l.attestationResult(clientAttestationResponse, attestationExpectations);
+    const regResult = await f2l.attestationResult(
+      clientAttestationResponse,
+      attestationExpectations,
+    );
 
     const credential = {
-      credId: coerceToBase64Url(regResult.authnrData.get("credId"), 'credId'),
-      publicKey: regResult.authnrData.get("credentialPublicKeyPem"),
-      aaguid: coerceToBase64Url(regResult.authnrData.get("aaguid"), 'aaguid'),
-      prevCounter: regResult.authnrData.get("counter")
+      credId: coerceToBase64Url(regResult.authnrData.get('credId'), 'credId'),
+      publicKey: regResult.authnrData.get('credentialPublicKeyPem'),
+      aaguid: coerceToBase64Url(regResult.authnrData.get('aaguid'), 'aaguid'),
+      prevCounter: regResult.authnrData.get('counter'),
     };
 
-    const user = db.get('users')
-      .find({ username: username })
-      .value();
+    const user = db.get('users').find({ username: username }).value();
 
     user.credentials.push(credential);
 
-    db.get('users')
-      .find({ username: username })
-      .assign(user)
-      .write();
+    db.get('users').find({ username: username }).assign(user).write();
 
     res.clearCookie('challenge');
 
@@ -371,13 +374,14 @@ router.post('/registerResponse', csrfCheck, sessionCheck, async (req, res) => {
  **/
 router.post('/signinRequest', csrfCheck, async (req, res) => {
   try {
-    const user = db.get('users')
+    const user = db
+      .get('users')
       .find({ username: req.cookies.username })
       .value();
 
     if (!user) {
       // Send empty response if user is not registered yet.
-      res.json({error: 'User not found.'});
+      res.json({ error: 'User not found.' });
       return;
     }
 
@@ -386,9 +390,9 @@ router.post('/signinRequest', csrfCheck, async (req, res) => {
     const response = await f2l.assertionOptions();
 
     // const response = {};
-    response.userVerification = req.body.userVerification || 'preferred';
+    response.userVerification = req.body.userVerification || 'required';
     response.challenge = coerceToBase64Url(response.challenge, 'challenge');
-    res.cookie('challenge', response.challenge);
+    res.cookie('challenge', response.challenge, sameSite);
 
     response.allowCredentials = [];
     for (let cred of user.credentials) {
@@ -397,7 +401,7 @@ router.post('/signinRequest', csrfCheck, async (req, res) => {
         response.allowCredentials.push({
           id: cred.credId,
           type: 'public-key',
-          transports: ['internal']
+          transports: ['internal'],
         });
       }
     }
@@ -425,9 +429,7 @@ router.post('/signinRequest', csrfCheck, async (req, res) => {
  **/
 router.post('/signinResponse', csrfCheck, async (req, res) => {
   // Query the user
-  const user = db.get('users')
-    .find({ username: req.cookies.username })
-    .value();
+  const user = db.get('users').find({ username: req.cookies.username }).value();
 
   let credential = null;
   for (let cred of user.credentials) {
@@ -445,35 +447,45 @@ router.post('/signinResponse', csrfCheck, async (req, res) => {
     const origin = `https://${req.get('host')}`; // TODO: Temporary work around for scheme
 
     const clientAssertionResponse = { response: {} };
-    clientAssertionResponse.rawId =
-      coerceToArrayBuffer(req.body.rawId, "rawId");
-    clientAssertionResponse.response.clientDataJSON =
-      coerceToArrayBuffer(req.body.response.clientDataJSON, "clientDataJSON");
-    clientAssertionResponse.response.authenticatorData =
-      coerceToArrayBuffer(req.body.response.authenticatorData, "authenticatorData");
-    clientAssertionResponse.response.signature =
-      coerceToArrayBuffer(req.body.response.signature, "signature");
-    clientAssertionResponse.response.userHandle =
-      coerceToArrayBuffer(req.body.response.userHandle, "userHandle");
+    clientAssertionResponse.rawId = coerceToArrayBuffer(
+      req.body.rawId,
+      'rawId',
+    );
+    clientAssertionResponse.response.clientDataJSON = coerceToArrayBuffer(
+      req.body.response.clientDataJSON,
+      'clientDataJSON',
+    );
+    clientAssertionResponse.response.authenticatorData = coerceToArrayBuffer(
+      req.body.response.authenticatorData,
+      'authenticatorData',
+    );
+    clientAssertionResponse.response.signature = coerceToArrayBuffer(
+      req.body.response.signature,
+      'signature',
+    );
+    clientAssertionResponse.response.userHandle = coerceToArrayBuffer(
+      req.body.response.userHandle,
+      'userHandle',
+    );
     const assertionExpectations = {
       challenge: challenge,
       origin: origin,
-      factor: "either",
+      factor: 'either',
       publicKey: credential.publicKey,
       prevCounter: credential.prevCounter,
-      userHandle: coerceToArrayBuffer(user.id, 'userHandle')
+      userHandle: coerceToArrayBuffer(user.id, 'userHandle'),
     };
-    const result = await f2l.assertionResult(clientAssertionResponse, assertionExpectations);
+    const result = await f2l.assertionResult(
+      clientAssertionResponse,
+      assertionExpectations,
+    );
 
-    credential.prevCounter = result.authnrData.get("counter");
+    credential.prevCounter = result.authnrData.get('counter');
 
-    db.get('users')
-      .find({ id: req.cookies.id })
-      .assign(user)
-      .write();
+    db.get('users').find({ id: req.cookies.id }).assign(user).write();
 
     res.clearCookie('challenge');
-    res.cookie('signed-in', 'yes');
+    res.cookie('signed-in', 'yes', sameSite);
     res.json(user);
   } catch (e) {
     res.clearCookie('challenge');
