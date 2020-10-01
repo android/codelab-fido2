@@ -29,10 +29,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
 
     <!-- import the webpage's stylesheet -->
-    <link rel="stylesheet" href="/style.css" />
+    <link rel="stylesheet" href="/bundle.css" />
     <link
       rel="stylesheet"
-      href="https://unpkg.com/material-components-web@latest/dist/material-components-web.min.css"
+      href="https://unpkg.com/material-components-web@7.0.0/dist/material-components-web.min.css"
     />
     <script src="https://cdn.jsdelivr.net/gh/herrjemand/Base64URL-ArrayBuffer@latest/lib/base64url-arraybuffer.js"></script>
     <script src="components-bundle.js"></script>
@@ -46,6 +46,9 @@
         <h2>Verify your identity</h2>
         <div>
           <mwc-button id="reauth" raised>Authenticate</mwc-button>
+        </div>
+        <div>
+          <mwc-button id="cancel">Sign-in with password</mwc-button>
         </div>
       </div>
       <form id="form" method="POST" action="/auth/password" class="hidden">
@@ -86,25 +89,36 @@
           .catch((e) => alert(e));
       });
 
+      if (window.PublicKeyCredential) {
+        PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable().then(
+          (UVPAA) => {
+            if (UVPAA && localStorage.getItem(`credId`)) {
+              document
+                .querySelector('#uvpa_available')
+                .classList.remove('hidden');
+            } else {
+              form.classList.remove('hidden');
+            }
+          },
+        );
+      } else {
+        form.classList.remove('hidden');
+      }
+
+      const cancel = document.querySelector('#cancel');
+      cancel.addEventListener('click', (e) => {
+        form.classList.remove('hidden');
+        document.querySelector('#uvpa_available').classList.add('hidden');
+      });
+
       const button = document.querySelector('#reauth');
-
-      PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable().then(
-        (UVPAA) => {
-          if (UVPAA && localStorage.getItem(`credId`)) {
-            document
-              .querySelector('#uvpa_available')
-              .classList.remove('hidden');
-          } else {
-            form.classList.remove('hidden');
-          }
-        },
-      );
-
       button.addEventListener('click', (e) => {
         authenticate({})
           .then((user) => {
             if (user) {
               location.href = '/home';
+            } else {
+              throw 'User not found.';
             }
           })
           .catch((e) => {

@@ -39,10 +39,6 @@ export const _fetch = async (path, payload = '') => {
 };
 
 export const registerCredential = async (opts) => {
-  if (!window.PublicKeyCredential) {
-    throw 'WebAuthn not supported on this browser.';
-  }
-
   const options = await _fetch('/auth/registerRequest', opts);
 
   options.user.id = base64url.decode(options.user.id);
@@ -78,11 +74,6 @@ export const registerCredential = async (opts) => {
 };
 
 export const authenticate = async (opts) => {
-  if (!window.PublicKeyCredential) {
-    console.info('WebAuthn not supported on this browser.');
-    return Promise.resolve(null);
-  }
-
   let url = '/auth/signinRequest';
   const credId = localStorage.getItem(`credId`);
   if (credId) {

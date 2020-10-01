@@ -22,7 +22,12 @@
     "babel-loader": "^8.1.0",
     "babel-preset-env": "^1.7.0",
     "@simplewebauthn/server": "^0.9.1",
-    "base64url": "^3.0.1"
+    "base64url": "^3.0.1",
+    "css-loader": "^4.3.0",
+    "sass-loader": "^10.0.2",
+    "sass": "^1.26.11",
+    "extract-loader": "^5.1.0",
+    "file-loader": "^6.0.0"
   },
   "engines": {
     "node": "10.x"
