@@ -32,6 +32,10 @@ body {
   margin: 0 16px;
 }
 
+.instructions {
+  color: gray;
+}
+
 .credential {
   margin: 10px 0 20px 0;
   padding: 10px;
@@ -41,6 +45,11 @@ body {
     white-space: nowrap;
     text-overflow: ellipsis;
   }
+}
+
+mwc-button > a {
+  text-decoration: none;
+  color: inherit;
 }
 
 .public-key {

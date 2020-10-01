@@ -48,6 +48,10 @@
 
     <main class="content">
       <h2>Welcome, {{username}}!</h2>
+      <p class="instructions">
+        Tap the button to the right bottom to register a new credential. Then
+        tap the "TRY REAUTH" button to emulate reauthentication.
+      </p>
       <p id="uvpa_unavailable" class="hidden">
         This device does not support User Verifying Platform Authenticator. You
         can't register a credential.
@@ -59,7 +63,7 @@
         <div id="list"></div>
         <mwc-fab id="register" class="hidden" icon="add"></mwc-fab>
       </section>
-      <mwc-button><a href="/">Try reauth</a></mwc-button>
+      <mwc-button raised><a href="/">Try reauth</a></mwc-button>
       <mwc-button><a href="/auth/signout">Sign out</a></mwc-button>
     </main>
     <script type="module">
