@@ -17,6 +17,7 @@
 
 * {
   box-sizing: border-box;
+  --mdc-theme-secondary: red;
 }
 
 body {
@@ -43,7 +44,7 @@ body {
     overflow: hidden;
     font-weight: bold;
     white-space: nowrap;
-    text-overflow: ellipsis;
+    text-overflow: ellipsis;    
   }
 }
 
@@ -65,7 +66,7 @@ mwc-button > a {
 
 #uvpa_available div {
   margin: 30px 0;
-  display: flex;
+  display:flex;
   justify-content: center;
 }
 

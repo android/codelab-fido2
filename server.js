@@ -17,7 +17,7 @@
 
 // init project
 const express = require('express');
-const cookieParser = require('cookie-parser');
+const session = require('express-session');
 const hbs = require('hbs');
 const auth = require('./libs/auth');
 const app = express();
@@ -25,10 +25,20 @@ const app = express();
 app.set('view engine', 'html');
 app.engine('html', hbs.__express);
 app.set('views', './views');
-app.use(cookieParser());
 app.use(express.json());
 app.use(express.static('public'));
 app.use(express.static('dist'));
+app.use(session({
+  secret: 'secret', // You should specify a real secret here
+  resave: true,
+  saveUninitialized: false,
+  proxy: true,
+  cookie:{
+    httpOnly: true,
+    secure: true,
+    sameSite: 'none'
+  }
+}));
 
 app.use((req, res, next) => {
   if (process.env.PROJECT_DOMAIN) {
@@ -50,8 +60,8 @@ app.use((req, res, next) => {
 
 // http://expressjs.com/en/starter/basic-routing.html
 app.get('/', (req, res) => {
-  // Check cookie
-  if (req.cookies.username) {
+  // Check session
+  if (req.session.username) {
     // If user is signed in, redirect to `/reauth`.
     res.redirect(307, '/reauth');
     return;
@@ -61,17 +71,17 @@ app.get('/', (req, res) => {
 });
 
 app.get('/home', (req, res) => {
-  if (!req.cookies.username || req.cookies['signed-in'] != 'yes') {
+  if (!req.session.username || req.session['signed-in'] != 'yes') {
     // If user is not signed in, redirect to `/`.
     res.redirect(307, '/');
     return;
   }
   // `home.html` shows sign-out link
-  res.render('home.html', { username: req.cookies.username });
+  res.render('home.html', { username: req.session.username });
 });
 
 app.get('/reauth', (req, res) => {
-  const username = req.cookies.username;
+  const username = req.session.username;
   if (!username) {
     res.redirect(302, '/');
     return;
@@ -92,7 +102,7 @@ app.get('/.well-known/assetlinks.json', (req, res) => {
     relation: relation,
     target: {
       namespace: 'web',
-      site: ORIGIN,
+      site: process.env.ORIGIN,
     },
   });
   if (process.env.ANDROID_PACKAGENAME && process.env.ANDROID_SHA256HASH) {

@@ -17,23 +17,13 @@
 <html lang="en">
   <head>
     <title>WebAuthn Codelab</title>
-    <meta name="description" content="WebAuthn Codelab" />
-    <link
-      id="favicon"
-      rel="icon"
-      href="https://glitch.com/edit/favicon-app.ico"
-      type="image/x-icon"
-    />
-    <meta charset="utf-8" />
-    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-
-    <!-- import the webpage's stylesheet -->
-    <link rel="stylesheet" href="/bundle.css" />
-    <link
-      rel="stylesheet"
-      href="https://unpkg.com/material-components-web@7.0.0/dist/material-components-web.min.css"
-    />
+    <meta name="description" content="WebAuthn Codelab">
+    <link id="favicon" rel="icon" href="https://glitch.com/edit/favicon-app.ico" type="image/x-icon">
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="/bundle.css">
+    <link rel="stylesheet" href="https://unpkg.com/material-components-web@7.0.0/dist/material-components-web.min.css">
     <script src="https://cdn.jsdelivr.net/gh/herrjemand/Base64URL-ArrayBuffer@latest/lib/base64url-arraybuffer.js"></script>
     <script src="components-bundle.js"></script>
   </head>
@@ -43,7 +33,9 @@
     </mwc-top-app-bar-fixed>
     <main class="content">
       <div id="uvpa_available" class="hidden">
-        <h2>Verify your identity</h2>
+        <h2>
+          Verify your identity
+        </h2>
         <div>
           <mwc-button id="reauth" raised>Authenticate</mwc-button>
         </div>
@@ -52,82 +44,74 @@
         </div>
       </div>
       <form id="form" method="POST" action="/auth/password" class="hidden">
-        <h2>Enter a password</h2>
+        <h2>
+          Enter a password
+        </h2>
         <input type="hidden" name="username" value="{{username}}" />
         <div class="mdc-text-field mdc-text-field--filled">
           <span class="mdc-text-field__ripple"></span>
           <label class="mdc-floating-label" id="password-label">password</label>
-          <input
-            type="password"
-            class="mdc-text-field__input"
-            aria-labelledby="password-label"
-            name="password"
-          />
+          <input type="password" class="mdc-text-field__input" aria-labelledby="password-label" name="password" />
           <span class="mdc-line-ripple"></span>
         </div>
-        <input
-          type="submit"
-          class="mdc-button mdc-button--raised"
-          value="Sign-In"
-        />
+        <input type="submit" class="mdc-button mdc-button--raised" value="Sign-In" />
         <p class="instructions">password will be ignored in this demo.</p>
       </form>
     </main>
-    <script src="https://unpkg.com/material-components-web@latest/dist/material-components-web.min.js"></script>
+    <script src="https://unpkg.com/material-components-web@7.0.0/dist/material-components-web.min.js"></script>
     <script type="module">
       new mdc.textField.MDCTextField(document.querySelector('.mdc-text-field'));
       import { _fetch, authenticate } from '/client.js';
       const form = document.querySelector('#form');
-      form.addEventListener('submit', (e) => {
+      form.addEventListener('submit', e => {
         e.preventDefault();
         const form = new FormData(e.target);
         const cred = {};
-        form.forEach((v, k) => (cred[k] = v));
+        form.forEach((v, k) => cred[k] = v);
         _fetch(e.target.action, cred)
-          .then((user) => {
-            location.href = '/home';
-          })
-          .catch((e) => alert(e));
+        .then(user => {
+          location.href = '/home';
+        })
+        .catch(e => alert(e));
       });
 
       if (window.PublicKeyCredential) {
-        PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable().then(
-          (UVPAA) => {
-            if (UVPAA && localStorage.getItem(`credId`)) {
-              document
-                .querySelector('#uvpa_available')
-                .classList.remove('hidden');
-            } else {
-              form.classList.remove('hidden');
-            }
-          },
-        );
+        PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()
+        .then(uvpaa => {
+          if (uvpaa && localStorage.getItem(`credId`)) {
+            document
+              .querySelector('#uvpa_available')
+              .classList.remove('hidden');
+          } else {
+            form.classList.remove('hidden');
+          }
+        });        
       } else {
         form.classList.remove('hidden');
       }
 
       const cancel = document.querySelector('#cancel');
-      cancel.addEventListener('click', (e) => {
+      cancel.addEventListener('click', e => {
         form.classList.remove('hidden');
-        document.querySelector('#uvpa_available').classList.add('hidden');
+        document
+          .querySelector('#uvpa_available')
+          .classList.add('hidden');        
       });
 
       const button = document.querySelector('#reauth');
-      button.addEventListener('click', (e) => {
-        authenticate({})
-          .then((user) => {
-            if (user) {
-              location.href = '/home';
-            } else {
-              throw 'User not found.';
-            }
-          })
-          .catch((e) => {
-            console.error(e.message || e);
-            alert('Authentication failed. Use password to sign-in.');
-            form.classList.remove('hidden');
-            document.querySelector('#uvpa_available').classList.add('hidden');
-          });
+      button.addEventListener('click', e => {
+        authenticate({}).then(user => {
+          if (user) {
+            location.href = '/home';
+          } else {
+            throw 'User not found.';
+          }
+        }).catch(e => {
+          console.error(e.message || e);
+          alert('Authentication failed. Use password to sign-in.');
+          form.classList.remove('hidden');
+          document.querySelector('#uvpa_available').classList.add('hidden');
+        });        
       });
     </script>
   </body>

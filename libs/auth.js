@@ -20,7 +20,6 @@ const crypto = require('crypto');
 const fido2 = require('@simplewebauthn/server');
 const base64url = require('base64url');
 const fs = require('fs');
-
 const low = require('lowdb');
 
 if (!fs.existsSync('./.data')) {
@@ -36,11 +35,6 @@ router.use(express.json());
 const RP_NAME = 'WebAuthn Codelab';
 const TIMEOUT = 30 * 1000 * 60;
 
-const sameSite = {
-  sameSite: 'none',
-  secure: true,
-};
-
 db.defaults({
   users: [],
 }).write();
@@ -55,19 +49,33 @@ const csrfCheck = (req, res, next) => {
 
 /**
  * Checks CSRF protection using custom header `X-Requested-With`
- * If cookie doesn't contain `username`, consider the user is not authenticated.
+ * If the session doesn't contain `signed-in`, consider the user is not authenticated.
  **/
 const sessionCheck = (req, res, next) => {
-  if (!req.cookies['signed-in']) {
+  if (!req.session['signed-in']) {
     res.status(401).json({ error: 'not signed in.' });
     return;
   }
   next();
 };
 
+const getOrigin = (userAgent) => {
+  let origin = '';
+  if (userAgent.indexOf('okhttp') === 0) {
+    const octArray = process.env.ANDROID_SHA256HASH.split(':').map((h) =>
+      parseInt(h, 16),
+    );
+    const androidHash = base64url.encode(octArray);
+    origin = `android:apk-key-hash:${androidHash}`;
+  } else {
+    origin = process.env.ORIGIN;
+  }
+  return origin;
+}
+
 /**
  * Check username, create a new account if it doesn't exist.
- * Set a `username` cookie.
+ * Set a `username` in the session.
  **/
 router.post('/username', (req, res) => {
   const username = req.body.username;
@@ -87,8 +95,8 @@ router.post('/username', (req, res) => {
       };
       db.get('users').push(user).write();
     }
-    // Set username cookie
-    res.cookie('username', username, sameSite);
+    // Set username in the session
+    req.session.username = username;
     // If sign-in succeeded, redirect to `/home`.
     res.json(user);
   }
@@ -104,21 +112,21 @@ router.post('/password', (req, res) => {
     res.status(401).json({ error: 'Enter at least one random letter.' });
     return;
   }
-  const user = db.get('users').find({ username: req.cookies.username }).value();
+  const user = db.get('users').find({ username: req.session.username }).value();
 
   if (!user) {
     res.status(401).json({ error: 'Enter username first.' });
     return;
   }
 
-  res.cookie('signed-in', 'yes', sameSite);
+  req.session['signed-in'] = 'yes';
   res.json(user);
 });
 
 router.get('/signout', (req, res) => {
-  // Remove cookies
-  res.clearCookie('username');
-  res.clearCookie('signed-in');
+  // Remove the session
+  delete req.session.username;
+  delete req.session['signed-in'];
   // Redirect to `/`
   res.redirect(302, '/');
 });
@@ -143,7 +151,7 @@ router.get('/signout', (req, res) => {
  ```
  **/
 router.post('/getKeys', csrfCheck, sessionCheck, (req, res) => {
-  const user = db.get('users').find({ username: req.cookies.username }).value();
+  const user = db.get('users').find({ username: req.session.username }).value();
   res.json(user || {});
 });
 
@@ -153,7 +161,7 @@ router.post('/getKeys', csrfCheck, sessionCheck, (req, res) => {
  **/
 router.post('/removeKey', csrfCheck, sessionCheck, (req, res) => {
   const credId = req.query.credId;
-  const username = req.cookies.username;
+  const username = req.session.username;
   const user = db.get('users').find({ username: username }).value();
 
   const newCreds = user.credentials.filter((cred) => {
@@ -208,7 +216,7 @@ router.get('/resetDB', (req, res) => {
  * }```
  **/
 router.post('/registerRequest', csrfCheck, sessionCheck, async (req, res) => {
-  const username = req.cookies.username;
+  const username = req.session.username;
   const user = db.get('users').find({ username: username }).value();
   try {
     const excludeCredentials = [];
@@ -264,11 +272,17 @@ router.post('/registerRequest', csrfCheck, sessionCheck, async (req, res) => {
       // Prompt users for additional information about the authenticator.
       attestationType: attestation,
       // Prevent users from re-registering existing authenticators
-      excludedCredentialIDs: excludeCredentials,
+      excludeCredentials,
       authenticatorSelection,
     });
 
-    res.cookie('challenge', options.challenge, sameSite);
+    req.session.challenge = options.challenge;
+
+    // Temporary hack until SimpleWebAuthn supports `pubKeyCredParams`
+    options.pubKeyCredParams = [];
+    for (let param of params) {
+      options.pubKeyCredParams.push({ type: 'public-key', alg: param });
+    }
 
     res.json(options);
   } catch (e) {
@@ -292,9 +306,9 @@ router.post('/registerRequest', csrfCheck, sessionCheck, async (req, res) => {
  * }```
  **/
 router.post('/registerResponse', csrfCheck, sessionCheck, async (req, res) => {
-  const username = req.cookies.username;
-  const expectedChallenge = req.cookies.challenge;
-  const expectedOrigin = process.env.ORIGIN;
+  const username = req.session.username;
+  const expectedChallenge = req.session.challenge;
+  const expectedOrigin = getOrigin(req.get('User-Agent'));
   const expectedRPID = process.env.HOSTNAME;
   const credId = req.body.id;
   const type = req.body.type;
@@ -302,22 +316,11 @@ router.post('/registerResponse', csrfCheck, sessionCheck, async (req, res) => {
   try {
     const { body } = req;
 
-    let origin = '';
-    if (req.get('User-Agent').indexOf('okhttp') > -1) {
-      const octArray = process.env.ANDROID_SHA256HASH.split(':').map((h) =>
-        parseInt(h, 16),
-      );
-      const androidHash = base64url.encode(octArray);
-      origin = `android:apk-key-hash:${androidHash}`; // TODO: Generate
-    } else {
-      origin = process.env.ORIGIN;
-    }
-
     const verification = await fido2.verifyAttestationResponse({
       credential: body,
       expectedChallenge,
-      expectedOrigin: origin,
-      expectedRPID: process.env.HOSTNAME,
+      expectedOrigin,
+      expectedRPID,
     });
 
     const { verified, authenticatorInfo } = verification;
@@ -347,12 +350,12 @@ router.post('/registerResponse', csrfCheck, sessionCheck, async (req, res) => {
 
     db.get('users').find({ username: username }).assign(user).write();
 
-    res.clearCookie('challenge');
+    delete req.session.challenge;
 
     // Respond with user info
     res.json(user);
   } catch (e) {
-    res.clearCookie('challenge');
+    delete req.session.challenge;
     res.status(400).send({ error: e.message });
   }
 });
@@ -375,7 +378,7 @@ router.post('/signinRequest', csrfCheck, async (req, res) => {
   try {
     const user = db
       .get('users')
-      .find({ username: req.cookies.username })
+      .find({ username: req.session.username })
       .value();
 
     if (!user) {
@@ -386,33 +389,31 @@ router.post('/signinRequest', csrfCheck, async (req, res) => {
 
     const credId = req.query.credId;
 
-    // const response = {};
     const userVerification = req.body.userVerification || 'required';
 
     const allowCredentials = [];
     for (let cred of user.credentials) {
-      // When credId is not specified, or matches the one specified
-      if (!credId || cred.credId == credId) {
-        allowCredentials.push(cred.credId);
-        // TODO: Waiting for [this issue](https://github.com/MasterKale/SimpleWebAuthn/issues/57) to be fixed.
-        // allowCredentials.push({
-        //   id: cred.credId,
-        //   type: 'public-key',
-        //   transports: ['internal']
-        // });
+      // `credId` is specified and matches
+      if (credId && cred.credId == credId) {
+        allowCredentials.push({
+          id: cred.credId,
+          type: 'public-key',
+          transports: ['internal']
+        });
       }
     }
 
     const options = fido2.generateAssertionOptions({
       timeout: TIMEOUT,
-      allowedCredentialIDs: allowCredentials,
+      rpID: process.env.HOSTNAME,
+      allowCredentials,
       /**
        * This optional value controls whether or not the authenticator needs be able to uniquely
        * identify the user interacting with it (via built-in PIN pad, fingerprint scanner, etc...)
        */
       userVerification,
     });
-    res.cookie('challenge', options.challenge, sameSite);
+    req.session.challenge = options.challenge;
 
     res.json(options);
   } catch (e) {
@@ -437,11 +438,14 @@ router.post('/signinRequest', csrfCheck, async (req, res) => {
  **/
 router.post('/signinResponse', csrfCheck, async (req, res) => {
   const { body } = req;
-  const expectedChallenge = req.cookies.challenge;
-  // Query the user
-  const user = db.get('users').find({ username: req.cookies.username }).value();
+  const expectedChallenge = req.session.challenge;
+  const expectedOrigin = getOrigin(req.get('User-Agent'));
+  const expectedRPID = process.env.HOSTNAME;
 
-  let credential = user.credentials.find((cred) => cred.credId === body.id);
+  // Query the user
+  const user = db.get('users').find({ username: req.session.username }).value();
+
+  let credential = user.credentials.find((cred) => cred.credId === req.body.id);
 
   try {
     if (!credential) {
@@ -451,8 +455,8 @@ router.post('/signinResponse', csrfCheck, async (req, res) => {
     const verification = fido2.verifyAssertionResponse({
       credential: body,
       expectedChallenge,
-      expectedOrigin: process.env.ORIGIN,
-      expectedRPID: process.env.HOSTNAME,
+      expectedOrigin,
+      expectedRPID,
       authenticator: credential,
     });
 
@@ -464,13 +468,13 @@ router.post('/signinResponse', csrfCheck, async (req, res) => {
 
     credential.prevCounter = authenticatorInfo.counter;
 
-    db.get('users').find({ id: req.cookies.id }).assign(user).write();
+    db.get('users').find({ username: req.session.username }).assign(user).write();
 
-    res.clearCookie('challenge');
-    res.cookie('signed-in', 'yes', sameSite);
+    delete req.session.challenge;
+    req.session['signed-in'] = 'yes';
     res.json(user);
   } catch (e) {
-    res.clearCookie('challenge');
+    delete req.session.challenge;
     res.status(400).json({ error: e });
   }
 });

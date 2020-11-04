@@ -17,22 +17,13 @@
 <html lang="en">
   <head>
     <title>WebAuthn Codelab</title>
-    <meta name="description" content="WebAuthn Codelab" />
-    <link
-      id="favicon"
-      rel="icon"
-      href="https://glitch.com/edit/favicon-app.ico"
-      type="image/x-icon"
-    />
-    <meta charset="utf-8" />
-    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-
-    <link rel="stylesheet" href="/bundle.css" />
-    <link
-      rel="stylesheet"
-      href="https://unpkg.com/material-components-web@7.0.0/dist/material-components-web.min.css"
-    />
+    <meta name="description" content="WebAuthn Codelab">
+    <link id="favicon" rel="icon" href="https://glitch.com/edit/favicon-app.ico" type="image/x-icon">
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="/bundle.css">
+    <link rel="stylesheet" href="https://unpkg.com/material-components-web@7.0.0/dist/material-components-web.min.css">
     <script src="components-bundle.js"></script>
   </head>
   <body class="mdc-typography">
@@ -40,44 +31,34 @@
       <span slot="title">WebAuthn codelab</span>
     </mwc-top-app-bar-fixed>
     <main class="content">
-      <h2>Login with a random username</h2>
-      <form id="form" method="POST" action="/auth/username">
+      <h2>
+        Login with a random username
+      </h2>
+      <form id="form" method="POST" action="/auth/username" >
         <div class="mdc-text-field mdc-text-field--filled">
           <span class="mdc-text-field__ripple"></span>
           <label class="mdc-floating-label" id="username-label">username</label>
-          <input
-            type="text"
-            class="mdc-text-field__input"
-            aria-labelledby="username-label"
-            name="username"
-          />
+          <input type="text" class="mdc-text-field__input" aria-labelledby="username-label" name="username" />
           <span class="mdc-line-ripple"></span>
         </div>
-        <input
-          type="submit"
-          class="mdc-button mdc-button--raised"
-          value="Next"
-        />
+        <input type="submit" class="mdc-button mdc-button--raised" value="Next" />
       </form>
       <script src="https://unpkg.com/material-components-web@latest/dist/material-components-web.min.js"></script>
       <script type="module">
-        new mdc.textField.MDCTextField(
-          document.querySelector('.mdc-text-field'),
-        );
+        new mdc.textField.MDCTextField(document.querySelector('.mdc-text-field'));
         import { _fetch } from '/client.js';
         const form = document.querySelector('#form');
-        form.addEventListener('submit', (e) => {
+        form.addEventListener('submit', e => {
           e.preventDefault();
           const form = new FormData(e.target);
           const cred = {};
-          form.forEach((v, k) => (cred[k] = v));
+          form.forEach((v, k) => cred[k] = v);
           _fetch(e.target.action, cred)
-            .then((user) => {
-              location.href = '/reauth';
-            })
-            .catch((e) => {
-              alert(e);
-            });
+          .then(user => {
+            location.href = '/reauth';
+          }).catch(e => {
+            alert(e);
+          });
         });
       </script>
     </main>

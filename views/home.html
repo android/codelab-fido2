@@ -17,27 +17,16 @@
 <html lang="en">
   <head>
     <title>WebAuthn Codelab</title>
-    <meta name="description" content="WebAuthn Codelab" />
-    <link
-      id="favicon"
-      rel="icon"
-      href="https://glitch.com/edit/favicon-app.ico"
-      type="image/x-icon"
-    />
-    <meta charset="utf-8" />
-    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="WebAuthn Codelab">
+    <link id="favicon" rel="icon" href="https://glitch.com/edit/favicon-app.ico" type="image/x-icon">
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
 
     <!-- import the webpage's stylesheet -->
-    <link rel="stylesheet" href="/bundle.css" />
-    <link
-      rel="stylesheet"
-      href="https://fonts.googleapis.com/icon?family=Material+Icons"
-    />
-    <link
-      rel="stylesheet"
-      href="https://unpkg.com/material-components-web@7.0.0/dist/material-components-web.min.css"
-    />
+    <link rel="stylesheet" href="/bundle.css">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+    <link rel="stylesheet" href="https://unpkg.com/material-components-web@7.0.0/dist/material-components-web.min.css">
     <script src="https://cdn.jsdelivr.net/gh/herrjemand/Base64URL-ArrayBuffer@latest/lib/base64url-arraybuffer.js"></script>
     <script src="components-bundle.js"></script>
   </head>
@@ -47,14 +36,11 @@
     </mwc-top-app-bar-fixed>
 
     <main class="content">
-      <h2>Welcome, {{username}}!</h2>
-      <p class="instructions">
-        Tap the button to the right bottom to register a new credential. Then
-        tap the "TRY REAUTH" button to emulate reauthentication.
-      </p>
+      <h2>
+        Welcome, {{username}}!
+      </h2>
       <p id="uvpa_unavailable" class="hidden">
-        This device does not support User Verifying Platform Authenticator. You
-        can't register a credential.
+        This device does not support User Verifying Platform Authenticator. You can't register a credential.
       </p>
       <h3 class="mdc-typography mdc-typography--headline6">
         Your registered credentials:
@@ -63,54 +49,51 @@
         <div id="list"></div>
         <mwc-fab id="register" class="hidden" icon="add"></mwc-fab>
       </section>
-      <mwc-button raised><a href="/">Try reauth</a></mwc-button>
+      <mwc-button raised><a href="/reauth">Try reauth</a></mwc-button>
       <mwc-button><a href="/auth/signout">Sign out</a></mwc-button>
     </main>
     <script type="module">
-      import {
-        _fetch,
-        registerCredential,
-        unregisterCredential,
-      } from '/client.js';
-      import {
-        html,
-        render,
-      } from 'https://unpkg.com/lit-html@1.0.0/lit-html.js?module';
+      import { _fetch, registerCredential, unregisterCredential } from '/client.js';
+      import { html, render } from 'https://unpkg.com/lit-html@1.0.0/lit-html.js?module';
 
       const register = document.querySelector('#register');
 
       if (window.PublicKeyCredential) {
-        PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable().then(
-          (UVPAA) => {
-            if (UVPAA) {
-              register.classList.remove('hidden');
-            } else {
-              document
-                .querySelector('#uvpa_unavailable')
-                .classList.remove('hidden');
-            }
-          },
-        );
+        PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()
+        .then(uvpaa => {
+          if (uvpaa) {
+            register.classList.remove('hidden');
+          } else {
+            document
+              .querySelector('#uvpa_unavailable')
+              .classList.remove('hidden');
+          }
+        });        
       } else {
-        document.querySelector('#uvpa_unavailable').classList.remove('hidden');
+        document
+          .querySelector('#uvpa_unavailable')
+          .classList.remove('hidden');
       }
 
-      register.addEventListener('click', (e) => {
-        registerCredential({
-          attestation: 'none',
-          authenticatorSelection: {
-            authenticatorAttachment: 'platform',
-            userVerification: 'required',
-            requireResidentKey: true, // Added for resident keys support
-          },
-        })
-          .then((user) => {
-            getCredentials();
-          })
-          .catch((e) => alert(e));
-      });
+      const getCredentials = async () => {
+        const res = await _fetch('/auth/getKeys');
+        const list = document.querySelector('#list');
+        const creds = html`${res.credentials.length > 0 ? res.credentials.map(cred => html`
+          <div class="mdc-card credential">
+            <span class="mdc-typography mdc-typography--body2">${cred.credId}</span>
+            <pre class="public-key">${cred.publicKey}</pre>
+            <div class="mdc-card__actions">
+              <mwc-button id="${cred.credId}" @click="${removeCredential}" raised>Remove</mwc-button>
+            </div>
+          </div>`) : html`
+          <p>No credentials found.</p>
+          `}`;
+        render(creds, list);
+      };
 
-      const removeCredential = async (e) => {
+      getCredentials();
+
+      const removeCredential = async e => {
         try {
           await unregisterCredential(e.target.id);
           getCredentials();
@@ -119,38 +102,20 @@
         }
       };
 
-      const getCredentials = async () => {
-        const res = await _fetch('/auth/getKeys');
-        const list = document.querySelector('#list');
-        const creds = html`
-          ${res.credentials.length > 0
-            ? res.credentials.map(
-                (cred) => html`
-                  <div class="mdc-card credential">
-                    <span class="mdc-typography mdc-typography--body2">
-                      ${cred.credId}
-                    </span>
-                    <pre class="public-key">${cred.publicKey}</pre>
-                    <div class="mdc-card__actions">
-                      <mwc-button
-                        id="${cred.credId}"
-                        @click="${removeCredential}"
-                        raised
-                      >
-                        Remove
-                      </mwc-button>
-                    </div>
-                  </div>
-                `,
-              )
-            : html`
-                <div>No credentials found.</div>
-              `}
-        `;
-        render(creds, list);
-      };
-
-      getCredentials();
+      register.addEventListener('click', e => {
+        registerCredential({
+          attestation: 'none',
+          authenticatorSelection: {
+            authenticatorAttachment: 'platform',
+            userVerification: 'required',
+            requireResidentKey: false
+          }
+        })
+        .then(user => {
+          getCredentials();
+        })
+        .catch(e => alert(e));
+      });
     </script>
   </body>
 </html>
