@@ -100,7 +100,7 @@
 
       const button = document.querySelector('#reauth');
       button.addEventListener('click', e => {
-        authenticate({}).then(user => {
+        authenticate().then(user => {
           if (user) {
             location.href = '/home';
           } else {
