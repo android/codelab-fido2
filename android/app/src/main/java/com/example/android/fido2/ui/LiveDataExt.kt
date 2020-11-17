@@ -20,9 +20,9 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.Observer
 
-fun <T> LiveData<T>.observeOnce(lifecycleOwner: LifecycleOwner, onChanged: (T) -> Unit) {
-    val observer = object : Observer<T> {
-        override fun onChanged(t: T) {
+fun <T> LiveData<T?>.observeOnce(lifecycleOwner: LifecycleOwner, onChanged: (T) -> Unit) {
+    val observer = object : Observer<T?> {
+        override fun onChanged(t: T?) {
             if (t != null) {
                 onChanged(t)
                 removeObserver(this)

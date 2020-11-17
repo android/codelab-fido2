@@ -16,27 +16,29 @@
 
 package com.example.android.fido2.ui.home
 
+import android.app.Activity
 import android.content.Intent
-import android.content.IntentSender
 import android.os.Bundle
 import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
-import androidx.lifecycle.observe
 import androidx.recyclerview.widget.LinearLayoutManager
-import com.example.android.fido2.MainActivity
 import com.example.android.fido2.R
 import com.example.android.fido2.databinding.HomeFragmentBinding
 import com.example.android.fido2.ui.observeOnce
+import com.google.android.gms.fido.Fido
+import com.google.android.gms.fido.fido2.api.common.AuthenticatorErrorResponse
 
 class HomeFragment : Fragment(), DeleteConfirmationFragment.Listener {
 
     companion object {
         private const val TAG = "HomeFragment"
         private const val FRAGMENT_DELETE_CONFIRMATION = "delete_confirmation"
+        const val REQUEST_FIDO2_REGISTER = 1
     }
 
     private val viewModel: HomeViewModel by viewModels()
@@ -97,17 +99,10 @@ class HomeFragment : Fragment(), DeleteConfirmationFragment.Listener {
         // FAB
         binding.add.setOnClickListener {
             viewModel.registerRequest().observeOnce(requireActivity()) { intent ->
-                val a = activity
-                if (intent.hasPendingIntent() && a != null) {
-                    try {
 
-                        // TODO(2): Open the fingerprint dialog.
-                        // - Open the fingerprint dialog by launching the intent from FIDO2 API.
+                // TODO(2): Open the fingerprint dialog.
+                // - Open the fingerprint dialog by launching the intent from FIDO2 API.
 
-                    } catch (e: IntentSender.SendIntentException) {
-                        Log.e(TAG, "Error launching pending intent for register request", e)
-                    }
-                }
             }
         }
     }
@@ -116,8 +111,25 @@ class HomeFragment : Fragment(), DeleteConfirmationFragment.Listener {
         viewModel.removeKey(credentialId)
     }
 
-    fun handleRegister(data: Intent) {
-        viewModel.registerResponse(data)
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        if (requestCode == REQUEST_FIDO2_REGISTER) {
+            val errorExtra = data?.getByteArrayExtra(Fido.FIDO2_KEY_ERROR_EXTRA)
+            when {
+                errorExtra != null -> {
+                    val error = AuthenticatorErrorResponse.deserializeFromBytes(errorExtra)
+                    error.errorMessage?.let { errorMessage ->
+                        Toast.makeText(requireContext(), errorMessage, Toast.LENGTH_LONG).show()
+                        Log.e(TAG, errorMessage)
+                    }
+                }
+                resultCode != Activity.RESULT_OK -> {
+                    Toast.makeText(requireContext(), R.string.cancelled, Toast.LENGTH_SHORT).show()
+                }
+                data != null -> viewModel.registerResponse(data)
+            }
+        } else {
+            super.onActivityResult(requestCode, resultCode, data)
+        }
     }
 
 }

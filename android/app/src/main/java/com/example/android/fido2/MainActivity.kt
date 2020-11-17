@@ -16,29 +16,19 @@
 
 package com.example.android.fido2
 
-import android.content.Intent
 import android.os.Bundle
-import android.util.Log
 import android.widget.Toast
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.commit
-import androidx.lifecycle.observe
 import com.example.android.fido2.repository.SignInState
 import com.example.android.fido2.ui.auth.AuthFragment
 import com.example.android.fido2.ui.home.HomeFragment
 import com.example.android.fido2.ui.username.UsernameFragment
 import com.google.android.gms.fido.Fido
-import com.google.android.gms.fido.fido2.api.common.AuthenticatorErrorResponse
 
 class MainActivity : AppCompatActivity() {
-
-    companion object {
-        private const val TAG = "MainActivity"
-        const val REQUEST_FIDO2_REGISTER = 1
-        const val REQUEST_FIDO2_SIGNIN = 2
-    }
 
     private val viewModel: MainViewModel by viewModels()
 
@@ -64,46 +54,6 @@ class MainActivity : AppCompatActivity() {
                     showFragment(HomeFragment::class.java) { HomeFragment() }
                 }
             }
-        }
-    }
-
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        when (requestCode) {
-            REQUEST_FIDO2_REGISTER -> {
-                val errorExtra = data?.getByteArrayExtra(Fido.FIDO2_KEY_ERROR_EXTRA)
-                if (errorExtra != null) {
-                    val error = AuthenticatorErrorResponse.deserializeFromBytes(errorExtra)
-                    error.errorMessage?.let { errorMessage ->
-                        Toast.makeText(this, errorMessage, Toast.LENGTH_LONG).show()
-                        Log.e(TAG, errorMessage)
-                    }
-                } else if (resultCode != RESULT_OK) {
-                    Toast.makeText(this, R.string.cancelled, Toast.LENGTH_SHORT).show()
-                } else {
-                    val fragment = supportFragmentManager.findFragmentById(R.id.container)
-                    if (data != null && fragment is HomeFragment) {
-                        fragment.handleRegister(data)
-                    }
-                }
-            }
-            REQUEST_FIDO2_SIGNIN -> {
-                val errorExtra = data?.getByteArrayExtra(Fido.FIDO2_KEY_ERROR_EXTRA)
-                if (errorExtra != null) {
-                    val error = AuthenticatorErrorResponse.deserializeFromBytes(errorExtra)
-                    error.errorMessage?.let { errorMessage ->
-                        Toast.makeText(this, errorMessage, Toast.LENGTH_LONG).show()
-                        Log.e(TAG, errorMessage)
-                    }
-                } else if (resultCode != RESULT_OK) {
-                    Toast.makeText(this, R.string.cancelled, Toast.LENGTH_SHORT).show()
-                } else {
-                    val fragment = supportFragmentManager.findFragmentById(R.id.container)
-                    if (data != null && fragment is AuthFragment) {
-                        fragment.handleSignin(data)
-                    }
-                }
-            }
-            else -> super.onActivityResult(requestCode, resultCode, data)
         }
     }
 

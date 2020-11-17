@@ -17,14 +17,14 @@
 package com.example.android.fido2.ui.home
 
 import android.app.Application
+import android.app.PendingIntent
 import android.content.Intent
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
-import androidx.lifecycle.Transformations
+import androidx.lifecycle.map
 import com.example.android.fido2.repository.AuthRepository
 import com.example.android.fido2.repository.SignInState
-import com.google.android.gms.fido.fido2.Fido2PendingIntent
 
 class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -34,26 +34,25 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     val processing: LiveData<Boolean>
         get() = _processing
 
-    val currentUsername: LiveData<String> =
-        Transformations.map(repository.getSignInState()) { state ->
-            when (state) {
-                is SignInState.SigningIn -> state.username
-                is SignInState.SignedIn -> state.username
-                else -> "User"
-            }
+    val currentUsername: LiveData<String> = repository.getSignInState().map { state ->
+        when (state) {
+            is SignInState.SigningIn -> state.username
+            is SignInState.SignedIn -> state.username
+            else -> "User"
         }
+    }
 
     val credentials = repository.getCredentials()
 
     fun reauth() {
-        repository.clearToken()
+        repository.clearCredentials()
     }
 
     fun signOut() {
         repository.signOut()
     }
 
-    fun registerRequest(): LiveData<Fido2PendingIntent> {
+    fun registerRequest(): LiveData<PendingIntent?> {
         return repository.registerRequest(_processing)
     }
 

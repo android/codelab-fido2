@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Google Inc. All Rights Reserved.
+ * Copyright 2020 Google Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,20 +14,18 @@
  * limitations under the License.
  */
 
-package com.example.android.fido2.ui
+package com.example.android.fido2.api
 
-import androidx.lifecycle.LifecycleOwner
-import androidx.lifecycle.LiveData
-import androidx.lifecycle.Observer
+class ApiResult<T>(
 
-fun <T> LiveData<T?>.observeOnce(lifecycleOwner: LifecycleOwner, onChanged: (T) -> Unit) {
-    val observer = object : Observer<T?> {
-        override fun onChanged(t: T?) {
-            if (t != null) {
-                onChanged(t)
-                removeObserver(this)
-            }
-        }
-    }
-    observe(lifecycleOwner, observer)
-}
+    /**
+     * The session ID to be used for the subsequent API calls. Might be null if the API call does
+     * not return a new cookie.
+     */
+    val sessionId: String?,
+
+    /**
+     * The result data.
+     */
+    val data: T
+)
