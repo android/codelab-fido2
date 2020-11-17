@@ -16,24 +16,27 @@
 
 package com.example.android.fido2.ui.auth
 
+import android.app.Activity
 import android.content.Intent
-import android.content.IntentSender
 import android.os.Bundle
 import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
-import androidx.lifecycle.observe
-import com.example.android.fido2.MainActivity
+import com.example.android.fido2.R
 import com.example.android.fido2.databinding.AuthFragmentBinding
 import com.example.android.fido2.ui.observeOnce
+import com.google.android.gms.fido.Fido
+import com.google.android.gms.fido.fido2.api.common.AuthenticatorErrorResponse
 
 class AuthFragment : Fragment() {
 
     companion object {
         private const val TAG = "AuthFragment"
+        const val REQUEST_FIDO2_SIGNIN = 2
     }
 
     private val viewModel: AuthViewModel by viewModels()
@@ -62,20 +65,38 @@ class AuthFragment : Fragment() {
 
     override fun onActivityCreated(savedInstanceState: Bundle?) {
         super.onActivityCreated(savedInstanceState)
-        viewModel.signinIntent.observeOnce(this) { intent ->
-            val a = activity
-            if (intent.hasPendingIntent() && a != null) {
-                try {
-                    intent.launchPendingIntent(a, MainActivity.REQUEST_FIDO2_SIGNIN)
-                } catch (e: IntentSender.SendIntentException) {
-                    Log.e(TAG, "Error launching pending intent for signin request", e)
-                }
-            }
+        viewModel.signinRequest().observeOnce(this) { intent ->
+            startIntentSenderForResult(
+                intent.intentSender,
+                REQUEST_FIDO2_SIGNIN,
+                null,
+                0,
+                0,
+                0,
+                null
+            )
         }
     }
 
-    fun handleSignin(data: Intent) {
-        viewModel.signinResponse(data)
-    }
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        if (requestCode == REQUEST_FIDO2_SIGNIN) {
+            val errorExtra = data?.getByteArrayExtra(Fido.FIDO2_KEY_ERROR_EXTRA)
+            if (errorExtra != null) {
+                val error = AuthenticatorErrorResponse.deserializeFromBytes(errorExtra)
+                error.errorMessage?.let { errorMessage ->
+                    Toast.makeText(requireContext(), errorMessage, Toast.LENGTH_LONG).show()
+                    Log.e(TAG, errorMessage)
+                }
+            } else if (resultCode != Activity.RESULT_OK) {
+                Toast.makeText(requireContext(), R.string.cancelled, Toast.LENGTH_SHORT).show()
+            } else {
+                if (data != null) {
+                    viewModel.signinResponse(data)
+                }
+            }
 
+        } else {
+            super.onActivityResult(requestCode, resultCode, data)
+        }
+    }
 }

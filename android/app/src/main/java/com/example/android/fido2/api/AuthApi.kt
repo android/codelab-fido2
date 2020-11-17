@@ -19,6 +19,7 @@ package com.example.android.fido2.api
 import android.util.JsonReader
 import android.util.JsonToken
 import android.util.JsonWriter
+import android.util.Log
 import com.example.android.fido2.BuildConfig
 import com.example.android.fido2.decodeBase64
 import com.example.android.fido2.toBase64
@@ -52,6 +53,8 @@ class AuthApi {
     companion object {
         private const val BASE_URL = BuildConfig.API_BASE_URL
         private val JSON = "application/json".toMediaTypeOrNull()
+        private const val SessionIdKey = "connect.sid="
+        private const val TAG = "AuthApi"
     }
 
     private val client = OkHttpClient.Builder()
@@ -63,9 +66,9 @@ class AuthApi {
 
     /**
      * @param username The username to be used for sign-in.
-     * @return The username.
+     * @return The Session ID.
      */
-    fun username(username: String): String {
+    fun username(username: String): ApiResult<Unit> {
         val call = client.newCall(
             Request.Builder()
                 .url("$BASE_URL/username")
@@ -79,19 +82,19 @@ class AuthApi {
             throwResponseError(response, "Error calling /username")
         }
 
-        return parseUsername(findSetCookieInResponse(response, "username"))
+        return response.result { Unit }
     }
 
     /**
-     * @param username The username sent to the server with `username()`.
+     * @param sessionId The session ID received on `username()`.
      * @param password A password.
-     * @return token The sign-in token to be used for subsequent API calls.
+     * @return An [ApiResult].
      */
-    fun password(username: String, password: String): String {
+    fun password(sessionId: String, password: String): ApiResult<Unit> {
         val call = client.newCall(
             Request.Builder()
                 .url("$BASE_URL/password")
-                .addHeader("Cookie", "username=$username")
+                .addHeader("Cookie", formatCookie(sessionId))
                 .method("POST", jsonRequestBody {
                     name("password").value(password)
                 })
@@ -101,19 +104,18 @@ class AuthApi {
         if (!response.isSuccessful) {
             throwResponseError(response, "Error calling /password")
         }
-        val cookie = findSetCookieInResponse(response, "signed-in")
-        return "$cookie; username=$username"
+        return response.result { Unit }
     }
 
     /**
-     * @param token The sign-in token.
+     * @param sessionId The session ID.
      * @return A list of all the credentials registered on the server.
      */
-    fun getKeys(token: String): List<Credential> {
+    fun getKeys(sessionId: String): ApiResult<List<Credential>> {
         val call = client.newCall(
             Request.Builder()
                 .url("$BASE_URL/getKeys")
-                .addHeader("Cookie", token)
+                .addHeader("Cookie", formatCookie(sessionId))
                 .method("POST", jsonRequestBody {})
                 .build()
         )
@@ -121,21 +123,23 @@ class AuthApi {
         if (!response.isSuccessful) {
             throwResponseError(response, "Error calling /getKeys")
         }
-        val body = response.body ?: throw ApiException("Empty response from /getKeys")
-        return parseUserCredentials(body)
+
+        return response.result {
+            parseUserCredentials(body ?: throw ApiException("Empty response from /getKeys"))
+        }
     }
 
     /**
-     * @param token The sign-in token.
+     * @param sessionId The session ID.
      * @return A pair. The `first` element is an [PublicKeyCredentialCreationOptions] that can be
      * used for a subsequent FIDO2 API call. The `second` element is a challenge string that should
      * be sent back to the server in [registerResponse].
      */
-    fun registerRequest(token: String): Pair<PublicKeyCredentialCreationOptions, String> {
+    fun registerRequest(sessionId: String): ApiResult<PublicKeyCredentialCreationOptions> {
         val call = client.newCall(
             Request.Builder()
                 .url("$BASE_URL/registerRequest")
-                .addHeader("Cookie", token)
+                .addHeader("Cookie", formatCookie(sessionId))
                 .method("POST", jsonRequestBody {
                     name("attestation").value("none")
                     name("authenticatorSelection").objectValue {
@@ -149,29 +153,31 @@ class AuthApi {
         if (!response.isSuccessful) {
             throwResponseError(response, "Error calling /registerRequest")
         }
-        val body = response.body ?: throw ApiException("Empty response from /registerRequest")
-        return parsePublicKeyCredentialCreationOptions(body)
+
+        return response.result {
+            parsePublicKeyCredentialCreationOptions(
+                body ?: throw ApiException("Empty response from /registerRequest")
+            )
+        }
     }
 
     /**
-     * @param token The sign-in token.
-     * @param challenge The challenge string returned by [registerRequest].
+     * @param sessionId The session ID.
      * @param response The FIDO2 response object.
      * @return A list of all the credentials registered on the server, including the newly
      * registered one.
      */
     fun registerResponse(
-        token: String,
-        challenge: String,
+        sessionId: String,
         response: AuthenticatorAttestationResponse
-    ): List<Credential> {
+    ): ApiResult<List<Credential>> {
         response.keyHandle.toBase64()
 
         val rawId = response.keyHandle.toBase64()
         val call = client.newCall(
             Request.Builder()
                 .url("$BASE_URL/registerResponse")
-                .addHeader("Cookie", "$token; challenge=$challenge")
+                .addHeader("Cookie", formatCookie(sessionId))
                 .method("POST", jsonRequestBody {
                     name("id").value(rawId)
                     name("type").value(PublicKeyCredentialType.PUBLIC_KEY.toString())
@@ -191,19 +197,22 @@ class AuthApi {
         if (!apiResponse.isSuccessful) {
             throwResponseError(apiResponse, "Error calling /registerResponse")
         }
-        val body = apiResponse.body ?: throw ApiException("Empty response from /registerResponse")
-        return parseUserCredentials(body)
+        return apiResponse.result {
+            parseUserCredentials(
+                body ?: throw ApiException("Empty response from /registerResponse")
+            )
+        }
     }
 
     /**
-     * @param token The sign-in token.
+     * @param sessionId The session ID.
      * @param credentialId The credential ID to be removed.
      */
-    fun removeKey(token: String, credentialId: String) {
+    fun removeKey(sessionId: String, credentialId: String): ApiResult<Unit> {
         val call = client.newCall(
             Request.Builder()
                 .url("$BASE_URL/removeKey?credId=$credentialId")
-                .addHeader("Cookie", token)
+                .addHeader("Cookie", formatCookie(sessionId))
                 .method("POST", jsonRequestBody {})
                 .build()
         )
@@ -211,20 +220,20 @@ class AuthApi {
         if (!response.isSuccessful) {
             throwResponseError(response, "Error calling /removeKey")
         }
-        // Nothing useful in the response body; ignore.
+        return response.result { Unit }
     }
 
     /**
-     * @param username The username to be used for the sign-in.
+     * @param sessionId The session ID to be used for the sign-in.
      * @param credentialId The credential ID of this device.
      * @return A pair. The `first` element is a [PublicKeyCredentialRequestOptions] that can be used
      * for a subsequent FIDO2 API call. The `second` element is a challenge string that should
      * be sent back to the server in [signinResponse].
      */
     fun signinRequest(
-        username: String,
+        sessionId: String,
         credentialId: String?
-    ): Pair<PublicKeyCredentialRequestOptions, String> {
+    ): ApiResult<PublicKeyCredentialRequestOptions> {
         val call = client.newCall(
             Request.Builder()
                 .url(
@@ -235,7 +244,7 @@ class AuthApi {
                         }
                     }
                 )
-                .addHeader("Cookie", "username=$username")
+                .addHeader("Cookie", formatCookie(sessionId))
                 .method("POST", jsonRequestBody {})
                 .build()
         )
@@ -243,8 +252,11 @@ class AuthApi {
         if (!response.isSuccessful) {
             throwResponseError(response, "Error calling /signinRequest")
         }
-        val body = response.body ?: throw ApiException("Empty response from /signinRequest")
-        return parsePublicKeyCredentialRequestOptions(body)
+        return response.result {
+            parsePublicKeyCredentialRequestOptions(
+                body ?: throw ApiException("Empty response from /signinRequest")
+            )
+        }
     }
 
     /**
@@ -253,15 +265,14 @@ class AuthApi {
      * @param response The assertion response from FIDO2 API.
      */
     fun signinResponse(
-        username: String,
-        challenge: String,
+        sessionId: String,
         response: AuthenticatorAssertionResponse
-    ): Pair<List<Credential>, String> {
+    ): ApiResult<List<Credential>> {
         val rawId = response.keyHandle.toBase64()
         val call = client.newCall(
             Request.Builder()
                 .url("$BASE_URL/signinResponse")
-                .addHeader("Cookie", "username=$username; challenge=$challenge")
+                .addHeader("Cookie", formatCookie(sessionId))
                 .method("POST", jsonRequestBody {
                     name("id").value(rawId)
                     name("type").value(PublicKeyCredentialType.PUBLIC_KEY.toString())
@@ -287,58 +298,45 @@ class AuthApi {
         if (!apiResponse.isSuccessful) {
             throwResponseError(apiResponse, "Error calling /signingResponse")
         }
-        val body = apiResponse.body ?: throw ApiException("Empty response from /signinResponse")
-        val cookie = findSetCookieInResponse(apiResponse, "signed-in")
-        return parseUserCredentials(body) to "$cookie; username=$username"
+        return apiResponse.result {
+            parseUserCredentials(body ?: throw ApiException("Empty response from /signinResponse"))
+        }
     }
 
     private fun parsePublicKeyCredentialRequestOptions(
         body: ResponseBody
-    ): Pair<PublicKeyCredentialRequestOptions, String> {
+    ): PublicKeyCredentialRequestOptions {
         val builder = PublicKeyCredentialRequestOptions.Builder()
-        var challenge: String? = null
         JsonReader(body.byteStream().bufferedReader()).use { reader ->
             reader.beginObject()
             while (reader.hasNext()) {
                 when (reader.nextName()) {
-                    "challenge" -> {
-                        val c = reader.nextString()
-                        challenge = c
-                        builder.setChallenge(c.decodeBase64())
-                    }
+                    "challenge" -> builder.setChallenge(reader.nextString().decodeBase64())
                     "userVerification" -> reader.skipValue()
                     "allowCredentials" -> builder.setAllowList(parseCredentialDescriptors(reader))
                     "rpId" -> builder.setRpId(reader.nextString())
-                    "timeout" -> {
-                        val timeout = reader.nextDouble()
-                        builder.setTimeoutSeconds(timeout)
-                    }
+                    "timeout" -> builder.setTimeoutSeconds(reader.nextDouble())
                     else -> reader.skipValue()
                 }
             }
             reader.endObject()
         }
-        return builder.build() to challenge!!
+        return builder.build()
     }
 
     private fun parsePublicKeyCredentialCreationOptions(
         body: ResponseBody
-    ): Pair<PublicKeyCredentialCreationOptions, String> {
+    ): PublicKeyCredentialCreationOptions {
         val builder = PublicKeyCredentialCreationOptions.Builder()
-        var challenge: String? = null
         JsonReader(body.byteStream().bufferedReader()).use { reader ->
             reader.beginObject()
             while (reader.hasNext()) {
                 when (reader.nextName()) {
                     "user" -> builder.setUser(parseUser(reader))
-                    "challenge" -> {
-                        val c = reader.nextString()
-                        builder.setChallenge(c.decodeBase64())
-                        challenge = c
-                    }
+                    "challenge" -> builder.setChallenge(reader.nextString().decodeBase64())
                     "pubKeyCredParams" -> builder.setParameters(parseParameters(reader))
                     "timeout" -> builder.setTimeoutSeconds(reader.nextDouble())
-                    "attestation" -> reader.skipValue() // Unusedp
+                    "attestation" -> reader.skipValue() // Unused
                     "excludeCredentials" -> builder.setExcludeList(
                         parseCredentialDescriptors(reader)
                     )
@@ -350,7 +348,7 @@ class AuthApi {
             }
             reader.endObject()
         }
-        return builder.build() to challenge!!
+        return builder.build()
     }
 
     private fun parseRp(reader: JsonReader): PublicKeyCredentialRpEntity {
@@ -466,15 +464,6 @@ class AuthApi {
         return output.toString().toRequestBody(JSON)
     }
 
-    private fun parseUsername(cookie: String): String {
-        val start = cookie.indexOf("username=")
-        val end = cookie.indexOf(";")
-        if (start < 0 || end < 0 || start + 9 >= end) {
-            throw RuntimeException("Cannot parse the cookie")
-        }
-        return cookie.substring(start + 9, end)
-    }
-
     private fun parseUserCredentials(body: ResponseBody): List<Credential> {
         fun readCredentials(reader: JsonReader): List<Credential> {
             val credentials = mutableListOf<Credential>()
@@ -542,9 +531,10 @@ class AuthApi {
                 reader.endObject()
             }
         } catch (e: Exception) {
-            throw ApiException("Cannot parse error: $errorString")
+            Log.e(TAG, "Cannot parse the error: $errorString", e)
+            // Don't throw; this method is called during throwing.
         }
-        return "" // Don't throw; this method is called during throwing.
+        return ""
     }
 
     private fun JsonWriter.objectValue(body: JsonWriter.() -> Unit) {
@@ -553,15 +543,22 @@ class AuthApi {
         endObject()
     }
 
-    /*
-     * Looks for a set-cookie header with a particular name
-     */
-    private fun findSetCookieInResponse(response: Response, cname: String): String {
-        for (header in response.headers("set-cookie")) {
-            if (header.startsWith("$cname=")) {
-                return header
-            }
+    private fun <T> Response.result(data: Response.() -> T): ApiResult<T> {
+        val cookie = headers("set-cookie").find { it.startsWith(SessionIdKey) }
+        return ApiResult(if (cookie != null) parseSessionId(cookie) else null, data())
+    }
+
+    private fun parseSessionId(cookie: String): String {
+        val start = cookie.indexOf(SessionIdKey)
+        if (start < 0) {
+            throw ApiException("Cannot find $SessionIdKey")
         }
-        throw ApiException("Cookie not found: $cname")
+        val semicolon = cookie.indexOf(";", start + SessionIdKey.length)
+        val end = if (semicolon < 0) cookie.length else semicolon
+        return cookie.substring(start + SessionIdKey.length, end)
+    }
+
+    private fun formatCookie(sessionId: String): String {
+        return "$SessionIdKey$sessionId"
     }
 }

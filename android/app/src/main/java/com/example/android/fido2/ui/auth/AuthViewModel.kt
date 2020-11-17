@@ -17,12 +17,13 @@
 package com.example.android.fido2.ui.auth
 
 import android.app.Application
+import android.app.PendingIntent
 import android.content.Intent
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MediatorLiveData
 import androidx.lifecycle.MutableLiveData
-import androidx.lifecycle.Transformations
+import androidx.lifecycle.map
 import com.example.android.fido2.repository.AuthRepository
 import com.example.android.fido2.repository.SignInState
 
@@ -48,16 +49,17 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         addSource(password) { update(_processing.value == true, it) }
     }
 
-    val signinIntent = repository.signinRequest(_processing)
+    fun signinRequest(): LiveData<PendingIntent?> {
+        return repository.signinRequest(_processing)
+    }
 
-    val currentUsername: LiveData<String> =
-        Transformations.map(repository.getSignInState()) { state ->
-            when (state) {
-                is SignInState.SigningIn -> state.username
-                is SignInState.SignedIn -> state.username
-                else -> "(user)"
-            }
+    val currentUsername: LiveData<String> = repository.getSignInState().map { state ->
+        when (state) {
+            is SignInState.SigningIn -> state.username
+            is SignInState.SignedIn -> state.username
+            else -> "(user)"
         }
+    }
 
     fun auth() {
         repository.password(password.value ?: "", _processing)
