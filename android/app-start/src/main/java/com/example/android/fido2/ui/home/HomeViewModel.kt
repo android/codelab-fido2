@@ -25,6 +25,7 @@ import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.map
 import com.example.android.fido2.repository.AuthRepository
 import com.example.android.fido2.repository.SignInState
+import com.google.android.gms.fido.fido2.Fido2PendingIntent
 
 class HomeViewModel(application: Application) : AndroidViewModel(application) {
 

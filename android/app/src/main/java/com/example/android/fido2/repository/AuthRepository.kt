@@ -254,6 +254,7 @@ class AuthRepository(
                     prefs.edit(commit = true) {
                         apiResult.sessionId?.let { putString(PREF_SESSION_ID, it) }
                     }
+
                     val task = client.getRegisterPendingIntent(apiResult.data)
                     result.postValue(Tasks.await(task))
                 } catch (e: Exception) {

@@ -28,20 +28,20 @@ android {
         versionName '1.0'
         testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
         vectorDrawables.useSupportLibrary = true
-        buildConfigField 'String', 'API_BASE_URL', "\"https://webauthn-codelab.glitch.me/auth\""
-        resValue 'string', 'host', 'https://webauthn-codelab.glitch.me'
+        buildConfigField 'String', 'API_BASE_URL', "\"https://butternut-skillful-santanaraptor.glitch.me/auth\""
+        resValue 'string', 'host', 'https://butternut-skillful-santanaraptor.glitch.me'
         resValue 'string', 'asset_statements', """
            [{
-             "include": "https://webauthn-codelab.glitch.me/.well-known/assetlinks.json"
+             "include": "https://butternut-skillful-santanaraptor.glitch.me/.well-known/assetlinks.json"
            }]
         """
     }
     signingConfigs {
-        debug {
-            storeFile file('../debug.jks')
-            storePassword 'android'
-            keyAlias 'androiddebugkey'
-            keyPassword 'android'
+        release {
+            storeFile file('C:\\Users\\njgx68\\OneDrive - Zebra Technologies\\Documents\\AndroidStudioProjects\\KeyStore\\releaseKeys.jks')
+            storePassword '123456'
+            keyAlias 'mykey'
+            keyPassword '123456'
         }
     }
     compileOptions {
@@ -56,10 +56,10 @@ android {
     }
     buildTypes {
         debug {
-            signingConfig signingConfigs.debug
+            signingConfig signingConfigs.release
         }
         release {
-            signingConfig signingConfigs.debug
+            signingConfig signingConfigs.release
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }

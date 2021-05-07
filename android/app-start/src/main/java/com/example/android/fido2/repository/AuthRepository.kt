@@ -34,6 +34,7 @@ import com.google.android.gms.fido.Fido
 import com.google.android.gms.fido.fido2.Fido2ApiClient
 import com.google.android.gms.fido.fido2.api.common.AuthenticatorAssertionResponse
 import com.google.android.gms.fido.fido2.api.common.AuthenticatorAttestationResponse
+import com.google.android.gms.tasks.Task
 import com.google.android.gms.tasks.Tasks
 import java.util.concurrent.Executor
 import java.util.concurrent.Executors
@@ -70,6 +71,7 @@ class AuthRepository(
         }
     }
 
+    private var lastKnownChallenge: ByteArray? = null
     private var fido2ApiClient: Fido2ApiClient? = null
 
     fun setFido2APiClient(client: Fido2ApiClient?) {
@@ -258,6 +260,17 @@ class AuthRepository(
                     //   new credential.
                     // - Pass the intent back to the `result` LiveData so that the UI can open the
                     //   fingerprint dialog.
+                    // Call the API.
+                    val options = api.registerRequest(sessionId)
+                    Log.v(TAG,   options.data.toString())
+                    // Save the challenge.
+                    lastKnownChallenge = options.data.challenge;
+                    // Use getRegisterIntent to get an Intent to
+                    // open the fingerprint dialog.
+                    //val task: Task<Fido2PendingIntent>? = client.getRegisterIntent(options.data)
+                    val task: Task<PendingIntent>? = client.getRegisterPendingIntent(options.data)
+                    // Pass the Intent back to the UI.
+                    result.postValue(task?.let { Tasks.await(it) })
 
                 } catch (e: Exception) {
                     Log.e(TAG, "Cannot call registerRequest", e)
@@ -288,6 +301,23 @@ class AuthRepository(
                 // - Also save the newly added credential ID into the SharedPreferences. The key is
                 //   PREF_LOCAL_CREDENTIAL_ID. The ID can be obtained from the `keyHandle` field of
                 //   the AuthenticatorAttestationResponse object.
+
+                val challenge = lastKnownChallenge!!
+
+                // Extract the AuthenticatorAttestationResponse.
+                val response = AuthenticatorAttestationResponse.deserializeFromBytes(
+                    data.getByteArrayExtra(Fido.FIDO2_KEY_RESPONSE_EXTRA)!!
+                )
+
+                // Memorize the credential ID.
+                val credentialId = response.keyHandle.toBase64()
+                // Call /auth/registerResponse.
+                val credentials = api.registerResponse(sessionId, response )
+                // Save the results.
+                prefs.edit {
+                    putStringSet(PREF_CREDENTIALS, credentials.data.toStringSet())
+                    putString(PREF_LOCAL_CREDENTIAL_ID, credentialId)
+                }
 
             } catch (e: ApiException) {
                 Log.e(TAG, "Cannot call registerResponse", e)
@@ -334,6 +364,14 @@ class AuthRepository(
                     //   credential.
                     // - Pass the intent to the `result` LiveData so that the UI can open the
                     //   fingerprint dialog.
+                    // Retrieve sign-in options from the server.
+                    val publicKeyCredentialRequestOptions = api.signinRequest(sessionId, credentialId)
+                    // Save the challenge string.
+                    lastKnownChallenge = publicKeyCredentialRequestOptions.data.challenge
+                    // Create an Intent to open the fingerprint dialog.
+                    val task = client.getSignPendingIntent(publicKeyCredentialRequestOptions.data)
+                    // Pass the Intent back to the UI.
+                    result.postValue(Tasks.await(task))
 
                 } finally {
                     processing.postValue(false)
@@ -365,6 +403,25 @@ class AuthRepository(
                 //   the AuthenticatorAssertionResponse object.
                 // - Notify the UI that the sign-in has succeeded. This can be done by calling
                 //   `invokeSignInStateListeners(SignInState.SignedIn(username))`
+
+                val challenge = lastKnownChallenge!!
+
+                // Extract the AuthenticatorAssertionResponse.
+                val response = AuthenticatorAssertionResponse.deserializeFromBytes(
+                    data.getByteArrayExtra(Fido.FIDO2_KEY_RESPONSE_EXTRA)
+                )
+                // Save the credential ID.
+                val credentialId = response.keyHandle.toBase64()
+                // Send the information to the server
+                val credentials = api.signinResponse(username, response)
+                // Store the results.
+                prefs.edit(commit = true) {
+                    //putString(PREF_, token)
+                    putStringSet(PREF_CREDENTIALS, credentials.data.toStringSet())
+                    putString(PREF_LOCAL_CREDENTIAL_ID, credentialId)
+                }
+                // Let the UI know that the sign-in succeeded.
+                invokeSignInStateListeners(SignInState.SignedIn(username))
 
             } catch (e: ApiException) {
                 Log.e(TAG, "Cannot call registerResponse", e)
