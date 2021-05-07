@@ -24,6 +24,7 @@ import com.example.android.fido2.BuildConfig
 import com.example.android.fido2.decodeBase64
 import com.example.android.fido2.toBase64
 import com.google.android.gms.fido.fido2.api.common.Attachment
+import com.google.android.gms.fido.fido2.api.common.AttestationConveyancePreference
 import com.google.android.gms.fido.fido2.api.common.AuthenticatorAssertionResponse
 import com.google.android.gms.fido.fido2.api.common.AuthenticatorAttestationResponse
 import com.google.android.gms.fido.fido2.api.common.AuthenticatorSelectionCriteria
@@ -141,10 +142,11 @@ class AuthApi {
                 .url("$BASE_URL/registerRequest")
                 .addHeader("Cookie", formatCookie(sessionId))
                 .method("POST", jsonRequestBody {
-                    name("attestation").value("none")
+                    name("attestation").value("direct")
                     name("authenticatorSelection").objectValue {
                         name("authenticatorAttachment").value("platform")
                         name("userVerification").value("required")
+                        name("requireResidentKey").value(true)
                     }
                 })
                 .build()
@@ -336,7 +338,8 @@ class AuthApi {
                     "challenge" -> builder.setChallenge(reader.nextString().decodeBase64())
                     "pubKeyCredParams" -> builder.setParameters(parseParameters(reader))
                     "timeout" -> builder.setTimeoutSeconds(reader.nextDouble())
-                    "attestation" -> reader.skipValue() // Unused
+                    "attestation" -> builder.setAttestationConveyancePreference(
+                        AttestationConveyancePreference.fromString(reader.nextString())) // Unused
                     "excludeCredentials" -> builder.setExcludeList(
                         parseCredentialDescriptors(reader)
                     )

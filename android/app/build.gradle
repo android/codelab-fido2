@@ -37,11 +37,11 @@ android {
         """
     }
     signingConfigs {
-        debug {
-            storeFile file('../debug.jks')
-            storePassword 'android'
-            keyAlias 'androiddebugkey'
-            keyPassword 'android'
+        release {
+            storeFile file('C:\\Users\\njgx68\\OneDrive - Zebra Technologies\\Documents\\AndroidStudioProjects\\KeyStore\\releaseKeys.jks')
+            storePassword '123456'
+            keyAlias 'mykey'
+            keyPassword '123456'
         }
     }
     compileOptions {
@@ -56,10 +56,10 @@ android {
     }
     buildTypes {
         debug {
-            signingConfig signingConfigs.debug
+            signingConfig signingConfigs.release
         }
         release {
-            signingConfig signingConfigs.debug
+            signingConfig signingConfigs.release
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }

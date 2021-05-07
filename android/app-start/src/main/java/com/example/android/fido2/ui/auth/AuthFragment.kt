@@ -26,6 +26,7 @@ import android.view.ViewGroup
 import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
+import androidx.lifecycle.observe
 import com.example.android.fido2.R
 import com.example.android.fido2.databinding.AuthFragmentBinding
 import com.example.android.fido2.ui.observeOnce

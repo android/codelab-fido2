@@ -22,6 +22,7 @@ import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.commit
+import androidx.lifecycle.observe
 import com.example.android.fido2.repository.SignInState
 import com.example.android.fido2.ui.auth.AuthFragment
 import com.example.android.fido2.ui.home.HomeFragment
