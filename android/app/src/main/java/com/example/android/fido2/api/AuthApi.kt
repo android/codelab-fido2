@@ -78,11 +78,7 @@ class AuthApi {
                 .build()
         )
         val response = call.execute()
-        if (!response.isSuccessful) {
-            throwResponseError(response, "Error calling /username")
-        }
-
-        return response.result { Unit }
+        return response.result("Error calling /username") { }
     }
 
     /**
@@ -101,10 +97,7 @@ class AuthApi {
                 .build()
         )
         val response = call.execute()
-        if (!response.isSuccessful) {
-            throwResponseError(response, "Error calling /password")
-        }
-        return response.result { Unit }
+        return response.result("Error calling /password") { }
     }
 
     /**
@@ -120,11 +113,7 @@ class AuthApi {
                 .build()
         )
         val response = call.execute()
-        if (!response.isSuccessful) {
-            throwResponseError(response, "Error calling /getKeys")
-        }
-
-        return response.result {
+        return response.result("Error calling /getKeys") {
             parseUserCredentials(body ?: throw ApiException("Empty response from /getKeys"))
         }
     }
@@ -150,11 +139,7 @@ class AuthApi {
                 .build()
         )
         val response = call.execute()
-        if (!response.isSuccessful) {
-            throwResponseError(response, "Error calling /registerRequest")
-        }
-
-        return response.result {
+        return response.result("Error calling /registerRequest") {
             parsePublicKeyCredentialCreationOptions(
                 body ?: throw ApiException("Empty response from /registerRequest")
             )
@@ -194,10 +179,7 @@ class AuthApi {
                 .build()
         )
         val apiResponse = call.execute()
-        if (!apiResponse.isSuccessful) {
-            throwResponseError(apiResponse, "Error calling /registerResponse")
-        }
-        return apiResponse.result {
+        return apiResponse.result("Error calling /registerResponse") {
             parseUserCredentials(
                 body ?: throw ApiException("Empty response from /registerResponse")
             )
@@ -217,10 +199,7 @@ class AuthApi {
                 .build()
         )
         val response = call.execute()
-        if (!response.isSuccessful) {
-            throwResponseError(response, "Error calling /removeKey")
-        }
-        return response.result { Unit }
+        return response.result("Error calling /removeKey") { }
     }
 
     /**
@@ -249,10 +228,7 @@ class AuthApi {
                 .build()
         )
         val response = call.execute()
-        if (!response.isSuccessful) {
-            throwResponseError(response, "Error calling /signinRequest")
-        }
-        return response.result {
+        return response.result("Error calling /signinRequest") {
             parsePublicKeyCredentialRequestOptions(
                 body ?: throw ApiException("Empty response from /signinRequest")
             )
@@ -295,10 +271,7 @@ class AuthApi {
                 .build()
         )
         val apiResponse = call.execute()
-        if (!apiResponse.isSuccessful) {
-            throwResponseError(apiResponse, "Error calling /signingResponse")
-        }
-        return apiResponse.result {
+        return apiResponse.result("Error calling /signingResponse") {
             parseUserCredentials(body ?: throw ApiException("Empty response from /signinResponse"))
         }
     }
@@ -543,9 +516,17 @@ class AuthApi {
         endObject()
     }
 
-    private fun <T> Response.result(data: Response.() -> T): ApiResult<T> {
+    private fun <T> Response.result(errorMessage: String, data: Response.() -> T): ApiResult<T> {
+        if (!isSuccessful) {
+            if (code == 401) { // Unauthorized
+                return ApiResult.SignedOutFromServer
+            }
+            // All other errors throw an exception.
+            throwResponseError(this, errorMessage)
+        }
         val cookie = headers("set-cookie").find { it.startsWith(SessionIdKey) }
-        return ApiResult(if (cookie != null) parseSessionId(cookie) else null, data())
+        val sessionId = if (cookie != null) parseSessionId(cookie) else null
+        return ApiResult.Success(sessionId, data())
     }
 
     private fun parseSessionId(cookie: String): String {
