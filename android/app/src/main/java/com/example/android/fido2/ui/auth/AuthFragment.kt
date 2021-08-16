@@ -35,14 +35,11 @@ import com.example.android.fido2.databinding.AuthFragmentBinding
 import com.example.android.fido2.ui.observeOnce
 import com.google.android.gms.fido.Fido
 import com.google.android.gms.fido.fido2.api.common.AuthenticatorErrorResponse
+import com.google.android.gms.fido.fido2.api.common.PublicKeyCredential
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
 class AuthFragment : Fragment() {
-
-    companion object {
-        private const val TAG = "AuthFragment"
-    }
 
     private val viewModel: AuthViewModel by viewModels()
     private lateinit var binding: AuthFragmentBinding
@@ -80,19 +77,21 @@ class AuthFragment : Fragment() {
     }
 
     private fun handleSignResult(activityResult: ActivityResult) {
-        val data = activityResult.data
-        val errorExtra = data?.getByteArrayExtra(Fido.FIDO2_KEY_ERROR_EXTRA)
-        if (errorExtra != null) {
-            val error = AuthenticatorErrorResponse.deserializeFromBytes(errorExtra)
-            error.errorMessage?.let { errorMessage ->
-                Toast.makeText(requireContext(), errorMessage, Toast.LENGTH_LONG).show()
-                Log.e(TAG, errorMessage)
-            }
-        } else if (activityResult.resultCode != Activity.RESULT_OK) {
-            Toast.makeText(requireContext(), R.string.cancelled, Toast.LENGTH_SHORT).show()
-        } else {
-            if (data != null) {
-                viewModel.signinResponse(data)
+        val bytes = activityResult.data?.getByteArrayExtra(Fido.FIDO2_KEY_CREDENTIAL_EXTRA)
+        when {
+            activityResult.resultCode != Activity.RESULT_OK ->
+                Toast.makeText(requireContext(), R.string.cancelled, Toast.LENGTH_LONG).show()
+            bytes == null ->
+                Toast.makeText(requireContext(), R.string.auth_error, Toast.LENGTH_LONG).show()
+            else -> {
+                val credential = PublicKeyCredential.deserializeFromBytes(bytes)
+                val response = credential.response
+                if (response is AuthenticatorErrorResponse) {
+                    Toast.makeText(requireContext(), response.errorMessage, Toast.LENGTH_LONG)
+                        .show()
+                } else {
+                    viewModel.signinResponse(credential)
+                }
             }
         }
     }

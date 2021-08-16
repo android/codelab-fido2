@@ -35,6 +35,7 @@ import com.google.android.gms.fido.Fido
 import com.google.android.gms.fido.fido2.Fido2ApiClient
 import com.google.android.gms.fido.fido2.api.common.AuthenticatorAssertionResponse
 import com.google.android.gms.fido.fido2.api.common.AuthenticatorAttestationResponse
+import com.google.android.gms.fido.fido2.api.common.PublicKeyCredential
 import com.google.android.gms.tasks.Tasks
 import java.util.concurrent.Executor
 import java.util.concurrent.Executors
@@ -288,7 +289,7 @@ class AuthRepository @Inject constructor(
      * Finishes registering a new credential to the server. This should only be called after
      * a call to [registerRequest] and a local FIDO2 API for public key generation.
      */
-    fun registerResponse(data: Intent, processing: MutableLiveData<Boolean>) {
+    fun registerResponse(credential: PublicKeyCredential, processing: MutableLiveData<Boolean>) {
         executor.execute {
             processing.postValue(true)
             try {
@@ -364,7 +365,7 @@ class AuthRepository @Inject constructor(
      * Finishes to signing in with a FIDO2 credential. This should only be called after a call to
      * [signinRequest] and a local FIDO2 API for key assertion.
      */
-    fun signinResponse(data: Intent, processing: MutableLiveData<Boolean>) {
+    fun signinResponse(credential: PublicKeyCredential, processing: MutableLiveData<Boolean>) {
         executor.execute {
             processing.postValue(true)
             try {

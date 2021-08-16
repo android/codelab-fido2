@@ -17,7 +17,6 @@
 package com.example.android.fido2.ui.auth
 
 import android.app.PendingIntent
-import android.content.Intent
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MediatorLiveData
 import androidx.lifecycle.MutableLiveData
@@ -25,6 +24,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.map
 import com.example.android.fido2.repository.AuthRepository
 import com.example.android.fido2.repository.SignInState
+import com.google.android.gms.fido.fido2.api.common.PublicKeyCredential
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 
@@ -67,8 +67,8 @@ class AuthViewModel @Inject constructor(
         repository.password(password.value ?: "", _processing)
     }
 
-    fun signinResponse(data: Intent) {
-        repository.signinResponse(data, _processing)
+    fun signinResponse(credential: PublicKeyCredential) {
+        repository.signinResponse(credential, _processing)
     }
 
 }

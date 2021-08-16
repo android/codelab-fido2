@@ -35,6 +35,7 @@ import com.google.android.gms.fido.Fido
 import com.google.android.gms.fido.fido2.Fido2ApiClient
 import com.google.android.gms.fido.fido2.api.common.AuthenticatorAssertionResponse
 import com.google.android.gms.fido.fido2.api.common.AuthenticatorAttestationResponse
+import com.google.android.gms.fido.fido2.api.common.PublicKeyCredential
 import com.google.android.gms.tasks.Tasks
 import java.util.concurrent.Executor
 import java.util.concurrent.Executors
@@ -288,16 +289,13 @@ class AuthRepository @Inject constructor(
      * Finishes registering a new credential to the server. This should only be called after
      * a call to [registerRequest] and a local FIDO2 API for public key generation.
      */
-    fun registerResponse(data: Intent, processing: MutableLiveData<Boolean>) {
+    fun registerResponse(credential: PublicKeyCredential, processing: MutableLiveData<Boolean>) {
         executor.execute {
             processing.postValue(true)
             try {
                 val sessionId = prefs.getString(PREF_SESSION_ID, null)!!
-                val response = AuthenticatorAttestationResponse.deserializeFromBytes(
-                    data.getByteArrayExtra(Fido.FIDO2_KEY_RESPONSE_EXTRA)!!
-                )
-                val credentialId = response.keyHandle.toBase64()
-                when (val result = api.registerResponse(sessionId, response)) {
+                val credentialId = credential.rawId.toBase64()
+                when (val result = api.registerResponse(sessionId, credential)) {
                     ApiResult.SignedOutFromServer -> forceSignOut()
                     is ApiResult.Success -> {
                         prefs.edit {
@@ -368,17 +366,14 @@ class AuthRepository @Inject constructor(
      * Finishes to signing in with a FIDO2 credential. This should only be called after a call to
      * [signinRequest] and a local FIDO2 API for key assertion.
      */
-    fun signinResponse(data: Intent, processing: MutableLiveData<Boolean>) {
+    fun signinResponse(credential: PublicKeyCredential, processing: MutableLiveData<Boolean>) {
         executor.execute {
             processing.postValue(true)
             try {
                 val username = prefs.getString(PREF_USERNAME, null)!!
                 val sessionId = prefs.getString(PREF_SESSION_ID, null)!!
-                val response = AuthenticatorAssertionResponse.deserializeFromBytes(
-                    data.getByteArrayExtra(Fido.FIDO2_KEY_RESPONSE_EXTRA)
-                )
-                val credentialId = response.keyHandle.toBase64()
-                when (val result = api.signinResponse(sessionId, response)) {
+                val credentialId = credential.rawId.toBase64()
+                when (val result = api.signinResponse(sessionId, credential)) {
                     ApiResult.SignedOutFromServer -> forceSignOut()
                     is ApiResult.Success -> {
                         prefs.edit(commit = true) {

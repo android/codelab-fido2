@@ -30,6 +30,7 @@
     <string name="auth_explanation">For the purpose of demonstration, the password you type is ignored.</string>
     <string name="password">Password</string>
     <string name="cancelled">Cancelled</string>
+    <string name="auth_error">Error trying to authenticate</string>
 
     <!-- Home -->
     <string name="credentials_caption">Your registered credentials:</string>
@@ -38,5 +39,6 @@
     <string name="sign_out">Sign Out</string>
     <string name="delete">Delete</string>
     <string name="delete_confirmation">Are you sure you want to delete this credential?\n\n%s</string>
+    <string name="credential_error">Error creating credential</string>
 
 </resources>

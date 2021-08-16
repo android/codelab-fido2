@@ -27,6 +27,7 @@ import com.google.android.gms.fido.fido2.api.common.Attachment
 import com.google.android.gms.fido.fido2.api.common.AuthenticatorAssertionResponse
 import com.google.android.gms.fido.fido2.api.common.AuthenticatorAttestationResponse
 import com.google.android.gms.fido.fido2.api.common.AuthenticatorSelectionCriteria
+import com.google.android.gms.fido.fido2.api.common.PublicKeyCredential
 import com.google.android.gms.fido.fido2.api.common.PublicKeyCredentialCreationOptions
 import com.google.android.gms.fido.fido2.api.common.PublicKeyCredentialDescriptor
 import com.google.android.gms.fido.fido2.api.common.PublicKeyCredentialParameters
@@ -144,18 +145,18 @@ class AuthApi @Inject constructor(
     }
 
     /**
-     * @param sessionId The session ID.
-     * @param response The FIDO2 response object.
+     * @param sessionId The session ID to be used for the sign-in.
+     * @param credential The PublicKeyCredential object.
      * @return A list of all the credentials registered on the server, including the newly
      * registered one.
      */
     fun registerResponse(
         sessionId: String,
-        response: AuthenticatorAttestationResponse
+        credential: PublicKeyCredential
     ): ApiResult<List<Credential>> {
-        response.keyHandle.toBase64()
+        val rawId = credential.rawId.toBase64()
+        val response = credential.response as AuthenticatorAttestationResponse
 
-        val rawId = response.keyHandle.toBase64()
         val call = client.newCall(
             Request.Builder()
                 .url("$BASE_URL/registerResponse")
@@ -233,15 +234,18 @@ class AuthApi @Inject constructor(
     }
 
     /**
-     * @param username The username to be used for this sign-in.
-     * @param challenge The challenge string returned by [signinRequest].
-     * @param response The assertion response from FIDO2 API.
+     * @param sessionId The session ID to be used for the sign-in.
+     * @param credential The PublicKeyCredential object.
+     * @return A list of all the credentials registered on the server, including the newly
+     * registered one.
      */
     fun signinResponse(
         sessionId: String,
-        response: AuthenticatorAssertionResponse
+        credential: PublicKeyCredential
     ): ApiResult<List<Credential>> {
-        val rawId = response.keyHandle.toBase64()
+        val rawId = credential.rawId.toBase64()
+        val response = credential.response as AuthenticatorAssertionResponse
+
         val call = client.newCall(
             Request.Builder()
                 .url("$BASE_URL/signinResponse")
