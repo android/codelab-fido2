@@ -32,7 +32,9 @@ import com.example.android.fido2.databinding.HomeFragmentBinding
 import com.example.android.fido2.ui.observeOnce
 import com.google.android.gms.fido.Fido
 import com.google.android.gms.fido.fido2.api.common.AuthenticatorErrorResponse
+import dagger.hilt.android.AndroidEntryPoint
 
+@AndroidEntryPoint
 class HomeFragment : Fragment(), DeleteConfirmationFragment.Listener {
 
     companion object {

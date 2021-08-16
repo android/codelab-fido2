@@ -24,7 +24,9 @@ import android.view.inputmethod.EditorInfo
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import com.example.android.fido2.databinding.UsernameFragmentBinding
+import dagger.hilt.android.AndroidEntryPoint
 
+@AndroidEntryPoint
 class UsernameFragment : Fragment() {
 
     private val viewModel: UsernameViewModel by viewModels()

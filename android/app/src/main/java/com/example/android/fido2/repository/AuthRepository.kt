@@ -37,11 +37,14 @@ import com.google.android.gms.fido.fido2.api.common.AuthenticatorAttestationResp
 import com.google.android.gms.tasks.Tasks
 import java.util.concurrent.Executor
 import java.util.concurrent.Executors
+import javax.inject.Inject
+import javax.inject.Singleton
 
 /**
  * Works with the API, the local data store, and FIDO2 API.
  */
-class AuthRepository(
+@Singleton
+class AuthRepository @Inject constructor(
     private val api: AuthApi,
     private val prefs: SharedPreferences,
     private val executor: Executor
@@ -56,18 +59,6 @@ class AuthRepository(
         private const val PREF_SESSION_ID = "session_id"
         private const val PREF_CREDENTIALS = "credentials"
         private const val PREF_LOCAL_CREDENTIAL_ID = "local_credential_id"
-
-        private var instance: AuthRepository? = null
-
-        fun getInstance(context: Context): AuthRepository {
-            return instance ?: synchronized(this) {
-                instance ?: AuthRepository(
-                    AuthApi(),
-                    context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE),
-                    Executors.newFixedThreadPool(64)
-                ).also { instance = it }
-            }
-        }
     }
 
     private var fido2ApiClient: Fido2ApiClient? = null

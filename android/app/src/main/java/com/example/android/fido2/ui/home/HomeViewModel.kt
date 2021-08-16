@@ -16,19 +16,21 @@
 
 package com.example.android.fido2.ui.home
 
-import android.app.Application
 import android.app.PendingIntent
 import android.content.Intent
-import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.map
 import com.example.android.fido2.repository.AuthRepository
 import com.example.android.fido2.repository.SignInState
+import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
 
-class HomeViewModel(application: Application) : AndroidViewModel(application) {
-
-    private val repository = AuthRepository.getInstance(application)
+@HiltViewModel
+class HomeViewModel @Inject constructor(
+    private val repository: AuthRepository
+) : ViewModel() {
 
     private val _processing = MutableLiveData<Boolean>()
     val processing: LiveData<Boolean>

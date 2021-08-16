@@ -16,16 +16,18 @@
 
 package com.example.android.fido2.ui.username
 
-import android.app.Application
-import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MediatorLiveData
 import androidx.lifecycle.MutableLiveData
+import androidx.lifecycle.ViewModel
 import com.example.android.fido2.repository.AuthRepository
+import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
 
-class UsernameViewModel(application: Application) : AndroidViewModel(application) {
-
-    private val repository = AuthRepository.getInstance(application)
+@HiltViewModel
+class UsernameViewModel @Inject constructor(
+    private val repository: AuthRepository
+) : ViewModel() {
 
     private val _sending = MutableLiveData<Boolean>()
     val sending: LiveData<Boolean>
