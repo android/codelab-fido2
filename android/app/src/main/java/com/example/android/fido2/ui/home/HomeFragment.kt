@@ -24,6 +24,11 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
+import androidx.activity.result.ActivityResult
+import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.result.IntentSenderRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.app.ActivityCompat
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -40,11 +45,12 @@ class HomeFragment : Fragment(), DeleteConfirmationFragment.Listener {
     companion object {
         private const val TAG = "HomeFragment"
         private const val FRAGMENT_DELETE_CONFIRMATION = "delete_confirmation"
-        const val REQUEST_FIDO2_REGISTER = 1
     }
 
     private val viewModel: HomeViewModel by viewModels()
     private lateinit var binding: HomeFragmentBinding
+
+    private lateinit var createCredentialIntentLauncher: ActivityResultLauncher<IntentSenderRequest>
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -90,6 +96,11 @@ class HomeFragment : Fragment(), DeleteConfirmationFragment.Listener {
             }
         }
 
+        createCredentialIntentLauncher = registerForActivityResult(
+            ActivityResultContracts.StartIntentSenderForResult(),
+            ::handleCreateCredentialResult
+        )
+
         viewModel.processing.observe(viewLifecycleOwner) { processing ->
             if (processing) {
                 binding.processing.show()
@@ -100,16 +111,8 @@ class HomeFragment : Fragment(), DeleteConfirmationFragment.Listener {
 
         // FAB
         binding.add.setOnClickListener {
-            viewModel.registerRequest().observeOnce(requireActivity()) { intent ->
-                startIntentSenderForResult(
-                    intent.intentSender,
-                    REQUEST_FIDO2_REGISTER,
-                    null,
-                    0,
-                    0,
-                    0,
-                    null
-                )
+            viewModel.registerRequest().observeOnce(viewLifecycleOwner) { intent ->
+                createCredentialIntentLauncher.launch(IntentSenderRequest.Builder(intent).build())
             }
         }
     }
@@ -118,25 +121,21 @@ class HomeFragment : Fragment(), DeleteConfirmationFragment.Listener {
         viewModel.removeKey(credentialId)
     }
 
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        if (requestCode == REQUEST_FIDO2_REGISTER) {
-            val errorExtra = data?.getByteArrayExtra(Fido.FIDO2_KEY_ERROR_EXTRA)
-            when {
-                errorExtra != null -> {
-                    val error = AuthenticatorErrorResponse.deserializeFromBytes(errorExtra)
-                    error.errorMessage?.let { errorMessage ->
-                        Toast.makeText(requireContext(), errorMessage, Toast.LENGTH_LONG).show()
-                        Log.e(TAG, errorMessage)
-                    }
+    private fun handleCreateCredentialResult(activityResult: ActivityResult) {
+        val data = activityResult.data
+        val errorExtra = data?.getByteArrayExtra(Fido.FIDO2_KEY_ERROR_EXTRA)
+        when {
+            errorExtra != null -> {
+                val error = AuthenticatorErrorResponse.deserializeFromBytes(errorExtra)
+                error.errorMessage?.let { errorMessage ->
+                    Toast.makeText(requireContext(), errorMessage, Toast.LENGTH_LONG).show()
+                    Log.e(TAG, errorMessage)
                 }
-                resultCode != Activity.RESULT_OK -> {
-                    Toast.makeText(requireContext(), R.string.cancelled, Toast.LENGTH_SHORT).show()
-                }
-                data != null -> viewModel.registerResponse(data)
             }
-        } else {
-            super.onActivityResult(requestCode, resultCode, data)
+            activityResult.resultCode != Activity.RESULT_OK -> {
+                Toast.makeText(requireContext(), R.string.cancelled, Toast.LENGTH_SHORT).show()
+            }
+            data != null -> viewModel.registerResponse(data)
         }
     }
-
 }
