@@ -37,6 +37,7 @@ import com.google.android.gms.fido.fido2.api.common.AuthenticatorAssertionRespon
 import com.google.android.gms.fido.fido2.api.common.AuthenticatorAttestationResponse
 import com.google.android.gms.fido.fido2.api.common.PublicKeyCredential
 import com.google.android.gms.tasks.Tasks
+import kotlinx.coroutines.tasks.await
 import java.util.concurrent.Executor
 import java.util.concurrent.Executors
 import javax.inject.Inject
@@ -129,42 +130,35 @@ class AuthRepository @Inject constructor(
      * Signs in with a password. This should be called only when the sign-in state is
      * [SignInState.SigningIn]. If it succeeds, the sign-in state will proceed to
      * [SignInState.SignedIn].
-     *
-     * @param processing The value is set to `true` while the API call is ongoing.
      */
-    fun password(password: String, processing: MutableLiveData<Boolean>) {
-        executor.execute {
-            processing.postValue(true)
-            val username = prefs.getString(PREF_USERNAME, null)!!
-            val sessionId = prefs.getString(PREF_SESSION_ID, null)!!
-            try {
-                when (val result = api.password(sessionId, password)) {
-                    ApiResult.SignedOutFromServer -> forceSignOut()
-                    is ApiResult.Success -> {
-                        prefs.edit(commit = true) {
-                            result.sessionId?.let {
-                                putString(PREF_SESSION_ID, it)
-                            }
+    suspend fun password(password: String) {
+        val username = prefs.getString(PREF_USERNAME, null)!!
+        val sessionId = prefs.getString(PREF_SESSION_ID, null)!!
+        try {
+            when (val result = api.password(sessionId, password)) {
+                ApiResult.SignedOutFromServer -> forceSignOut()
+                is ApiResult.Success -> {
+                    prefs.edit(commit = true) {
+                        result.sessionId?.let {
+                            putString(PREF_SESSION_ID, it)
                         }
-                        invokeSignInStateListeners(SignInState.SignedIn(username))
                     }
+                    invokeSignInStateListeners(SignInState.SignedIn(username))
                 }
-            } catch (e: ApiException) {
-                Log.e(TAG, "Invalid login credentials", e)
-
-                // start login over again
-                prefs.edit(commit = true) {
-                    remove(PREF_USERNAME)
-                    remove(PREF_SESSION_ID)
-                    remove(PREF_CREDENTIALS)
-                }
-
-                invokeSignInStateListeners(
-                    SignInState.SignInError(e.message ?: "Invalid login credentials")
-                )
-            } finally {
-                processing.postValue(false)
             }
+        } catch (e: ApiException) {
+            Log.e(TAG, "Invalid login credentials", e)
+
+            // start login over again
+            prefs.edit(commit = true) {
+                remove(PREF_USERNAME)
+                remove(PREF_SESSION_ID)
+                remove(PREF_CREDENTIALS)
+            }
+
+            invokeSignInStateListeners(
+                SignInState.SignInError(e.message ?: "Invalid login credentials")
+            )
         }
     }
 
@@ -331,59 +325,45 @@ class AuthRepository @Inject constructor(
      * Starts to sign in with a FIDO2 credential. This should only be called when the sign-in state
      * is [SignInState.SigningIn].
      */
-    fun signinRequest(processing: MutableLiveData<Boolean>): LiveData<PendingIntent?> {
-        val result = MutableLiveData<PendingIntent?>()
-        executor.execute {
-            fido2ApiClient?.let { client ->
-                processing.postValue(true)
-                try {
-                    val sessionId = prefs.getString(PREF_SESSION_ID, null)!!
-                    val credentialId = prefs.getString(PREF_LOCAL_CREDENTIAL_ID, null)
-                    if (credentialId != null) {
-                        when (val apiResult = api.signinRequest(sessionId, credentialId)) {
-                            ApiResult.SignedOutFromServer -> forceSignOut()
-                            is ApiResult.Success -> {
-                                val task = client.getSignPendingIntent(apiResult.data)
-                                result.postValue(Tasks.await(task))
-                            }
-                        }
+    suspend fun signinRequest(): PendingIntent? {
+        fido2ApiClient?.let { client ->
+            val sessionId = prefs.getString(PREF_SESSION_ID, null)!!
+            val credentialId = prefs.getString(PREF_LOCAL_CREDENTIAL_ID, null)
+            if (credentialId != null) {
+                when (val apiResult = api.signinRequest(sessionId, credentialId)) {
+                    ApiResult.SignedOutFromServer -> forceSignOut()
+                    is ApiResult.Success -> {
+                        val task = client.getSignPendingIntent(apiResult.data)
+                        return task.await()
                     }
-                } finally {
-                    processing.postValue(false)
                 }
             }
         }
-        return result
+        return null
     }
 
     /**
      * Finishes to signing in with a FIDO2 credential. This should only be called after a call to
      * [signinRequest] and a local FIDO2 API for key assertion.
      */
-    fun signinResponse(credential: PublicKeyCredential, processing: MutableLiveData<Boolean>) {
-        executor.execute {
-            processing.postValue(true)
-            try {
-                val username = prefs.getString(PREF_USERNAME, null)!!
-                val sessionId = prefs.getString(PREF_SESSION_ID, null)!!
-                val credentialId = credential.rawId.toBase64()
-                when (val result = api.signinResponse(sessionId, credential)) {
-                    ApiResult.SignedOutFromServer -> forceSignOut()
-                    is ApiResult.Success -> {
-                        prefs.edit(commit = true) {
-                            result.sessionId?.let { putString(PREF_SESSION_ID, it) }
-                            putStringSet(PREF_CREDENTIALS, result.data.toStringSet())
-                            putString(PREF_LOCAL_CREDENTIAL_ID, credentialId)
-                        }
-                        invokeSignInStateListeners(SignInState.SignedIn(username))
+    suspend fun signinResponse(credential: PublicKeyCredential) {
+        try {
+            val username = prefs.getString(PREF_USERNAME, null)!!
+            val sessionId = prefs.getString(PREF_SESSION_ID, null)!!
+            val credentialId = credential.rawId.toBase64()
+            when (val result = api.signinResponse(sessionId, credential)) {
+                ApiResult.SignedOutFromServer -> forceSignOut()
+                is ApiResult.Success -> {
+                    prefs.edit(commit = true) {
+                        result.sessionId?.let { putString(PREF_SESSION_ID, it) }
+                        putStringSet(PREF_CREDENTIALS, result.data.toStringSet())
+                        putString(PREF_LOCAL_CREDENTIAL_ID, credentialId)
                     }
+                    invokeSignInStateListeners(SignInState.SignedIn(username))
                 }
-            } catch (e: ApiException) {
-                Log.e(TAG, "Cannot call registerResponse", e)
-            } finally {
-                processing.postValue(false)
             }
+        } catch (e: ApiException) {
+            Log.e(TAG, "Cannot call registerResponse", e)
         }
     }
-
 }

@@ -85,7 +85,7 @@ class AuthApi @Inject constructor(
      * @param password A password.
      * @return An [ApiResult].
      */
-    fun password(sessionId: String, password: String): ApiResult<Unit> {
+    suspend fun password(sessionId: String, password: String): ApiResult<Unit> {
         val call = client.newCall(
             Request.Builder()
                 .url("$BASE_URL/password")
@@ -95,7 +95,7 @@ class AuthApi @Inject constructor(
                 })
                 .build()
         )
-        val response = call.execute()
+        val response = call.await()
         return response.result("Error calling /password") { }
     }
 
@@ -208,7 +208,7 @@ class AuthApi @Inject constructor(
      * for a subsequent FIDO2 API call. The `second` element is a challenge string that should
      * be sent back to the server in [signinResponse].
      */
-    fun signinRequest(
+    suspend fun signinRequest(
         sessionId: String,
         credentialId: String?
     ): ApiResult<PublicKeyCredentialRequestOptions> {
@@ -226,7 +226,7 @@ class AuthApi @Inject constructor(
                 .method("POST", jsonRequestBody {})
                 .build()
         )
-        val response = call.execute()
+        val response = call.await()
         return response.result("Error calling /signinRequest") {
             parsePublicKeyCredentialRequestOptions(
                 body ?: throw ApiException("Empty response from /signinRequest")
@@ -240,7 +240,7 @@ class AuthApi @Inject constructor(
      * @return A list of all the credentials registered on the server, including the newly
      * registered one.
      */
-    fun signinResponse(
+    suspend fun signinResponse(
         sessionId: String,
         credential: PublicKeyCredential
     ): ApiResult<List<Credential>> {
@@ -272,7 +272,7 @@ class AuthApi @Inject constructor(
                 })
                 .build()
         )
-        val apiResponse = call.execute()
+        val apiResponse = call.await()
         return apiResponse.result("Error calling /signingResponse") {
             parseUserCredentials(body ?: throw ApiException("Empty response from /signinResponse"))
         }
