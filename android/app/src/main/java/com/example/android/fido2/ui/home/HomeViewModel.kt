@@ -27,7 +27,10 @@ import com.example.android.fido2.repository.SignInState
 import com.google.android.gms.fido.fido2.api.common.PublicKeyCredential
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -39,13 +42,13 @@ class HomeViewModel @Inject constructor(
     private val _processing = MutableStateFlow(false)
     val processing = _processing.asStateFlow()
 
-    val currentUsername: LiveData<String> = repository.getSignInState().map { state ->
+    val currentUsername = repository.signInState.map { state ->
         when (state) {
             is SignInState.SigningIn -> state.username
             is SignInState.SignedIn -> state.username
-            else -> "User"
+            else -> "(user)"
         }
-    }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(), "(user)")
 
     val credentials = repository.getCredentials()
 
