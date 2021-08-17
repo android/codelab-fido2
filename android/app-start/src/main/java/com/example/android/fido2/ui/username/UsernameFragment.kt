@@ -23,8 +23,10 @@ import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
+import androidx.lifecycle.lifecycleScope
 import com.example.android.fido2.databinding.UsernameFragmentBinding
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.flow.collect
 
 @AndroidEntryPoint
 class UsernameFragment : Fragment() {
@@ -43,13 +45,16 @@ class UsernameFragment : Fragment() {
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
-        viewModel.sending.observe(viewLifecycleOwner) { sending ->
-            if (sending) {
-                binding.sending.show()
-            } else {
-                binding.sending.hide()
+        viewLifecycleOwner.lifecycleScope.launchWhenStarted {
+            viewModel.sending.collect { sending ->
+                if (sending) {
+                    binding.sending.show()
+                } else {
+                    binding.sending.hide()
+                }
             }
         }
+
         binding.inputUsername.setOnEditorActionListener { _, actionId, _ ->
             if (actionId == EditorInfo.IME_ACTION_GO) {
                 viewModel.sendUsername()

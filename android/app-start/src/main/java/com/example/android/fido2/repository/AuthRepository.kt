@@ -17,8 +17,6 @@
 package com.example.android.fido2.repository
 
 import android.app.PendingIntent
-import android.content.Context
-import android.content.Intent
 import android.content.SharedPreferences
 import android.util.Log
 import androidx.annotation.WorkerThread
@@ -30,15 +28,9 @@ import com.example.android.fido2.api.ApiException
 import com.example.android.fido2.api.ApiResult
 import com.example.android.fido2.api.AuthApi
 import com.example.android.fido2.api.Credential
-import com.example.android.fido2.toBase64
-import com.google.android.gms.fido.Fido
 import com.google.android.gms.fido.fido2.Fido2ApiClient
-import com.google.android.gms.fido.fido2.api.common.AuthenticatorAssertionResponse
-import com.google.android.gms.fido.fido2.api.common.AuthenticatorAttestationResponse
 import com.google.android.gms.fido.fido2.api.common.PublicKeyCredential
-import com.google.android.gms.tasks.Tasks
 import java.util.concurrent.Executor
-import java.util.concurrent.Executors
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -112,22 +104,15 @@ class AuthRepository @Inject constructor(
      * Sends the username to the server. If it succeeds, the sign-in state will proceed to
      * [SignInState.SigningIn].
      */
-    fun username(username: String, sending: MutableLiveData<Boolean>) {
-        executor.execute {
-            sending.postValue(true)
-            try {
-                when (val result = api.username(username)) {
-                    ApiResult.SignedOutFromServer -> forceSignOut()
-                    is ApiResult.Success -> {
-                        prefs.edit(commit = true) {
-                            putString(PREF_USERNAME, username)
-                            putString(PREF_SESSION_ID, result.sessionId!!)
-                        }
-                        invokeSignInStateListeners(SignInState.SigningIn(username))
-                    }
+    suspend fun username(username: String) {
+        when (val result = api.username(username)) {
+            ApiResult.SignedOutFromServer -> forceSignOut()
+            is ApiResult.Success -> {
+                prefs.edit(commit = true) {
+                    putString(PREF_USERNAME, username)
+                    putString(PREF_SESSION_ID, result.sessionId!!)
                 }
-            } finally {
-                sending.postValue(false)
+                invokeSignInStateListeners(SignInState.SigningIn(username))
             }
         }
     }

@@ -42,9 +42,9 @@ import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
 import okhttp3.ResponseBody
+import ru.gildor.coroutines.okhttp.await
 import java.io.StringReader
 import java.io.StringWriter
-import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 
 /**
@@ -65,7 +65,7 @@ class AuthApi @Inject constructor(
      * @param username The username to be used for sign-in.
      * @return The Session ID.
      */
-    fun username(username: String): ApiResult<Unit> {
+    suspend fun username(username: String): ApiResult<Unit> {
         val call = client.newCall(
             Request.Builder()
                 .url("$BASE_URL/username")
@@ -74,7 +74,7 @@ class AuthApi @Inject constructor(
                 })
                 .build()
         )
-        val response = call.execute()
+        val response = call.await()
         return response.result("Error calling /username") { }
     }
 
