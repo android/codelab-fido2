@@ -103,7 +103,7 @@ class AuthApi @Inject constructor(
      * @param sessionId The session ID.
      * @return A list of all the credentials registered on the server.
      */
-    fun getKeys(sessionId: String): ApiResult<List<Credential>> {
+    suspend fun getKeys(sessionId: String): ApiResult<List<Credential>> {
         val call = client.newCall(
             Request.Builder()
                 .url("$BASE_URL/getKeys")
@@ -111,7 +111,7 @@ class AuthApi @Inject constructor(
                 .method("POST", jsonRequestBody {})
                 .build()
         )
-        val response = call.execute()
+        val response = call.await()
         return response.result("Error calling /getKeys") {
             parseUserCredentials(body ?: throw ApiException("Empty response from /getKeys"))
         }
@@ -123,7 +123,7 @@ class AuthApi @Inject constructor(
      * used for a subsequent FIDO2 API call. The `second` element is a challenge string that should
      * be sent back to the server in [registerResponse].
      */
-    fun registerRequest(sessionId: String): ApiResult<PublicKeyCredentialCreationOptions> {
+    suspend fun registerRequest(sessionId: String): ApiResult<PublicKeyCredentialCreationOptions> {
         val call = client.newCall(
             Request.Builder()
                 .url("$BASE_URL/registerRequest")
@@ -137,7 +137,7 @@ class AuthApi @Inject constructor(
                 })
                 .build()
         )
-        val response = call.execute()
+        val response = call.await()
         return response.result("Error calling /registerRequest") {
             parsePublicKeyCredentialCreationOptions(
                 body ?: throw ApiException("Empty response from /registerRequest")
@@ -151,7 +151,7 @@ class AuthApi @Inject constructor(
      * @return A list of all the credentials registered on the server, including the newly
      * registered one.
      */
-    fun registerResponse(
+    suspend fun registerResponse(
         sessionId: String,
         credential: PublicKeyCredential
     ): ApiResult<List<Credential>> {
@@ -177,7 +177,7 @@ class AuthApi @Inject constructor(
                 })
                 .build()
         )
-        val apiResponse = call.execute()
+        val apiResponse = call.await()
         return apiResponse.result("Error calling /registerResponse") {
             parseUserCredentials(
                 body ?: throw ApiException("Empty response from /registerResponse")
@@ -189,7 +189,7 @@ class AuthApi @Inject constructor(
      * @param sessionId The session ID.
      * @param credentialId The credential ID to be removed.
      */
-    fun removeKey(sessionId: String, credentialId: String): ApiResult<Unit> {
+    suspend fun removeKey(sessionId: String, credentialId: String): ApiResult<Unit> {
         val call = client.newCall(
             Request.Builder()
                 .url("$BASE_URL/removeKey?credId=$credentialId")
@@ -197,7 +197,7 @@ class AuthApi @Inject constructor(
                 .method("POST", jsonRequestBody {})
                 .build()
         )
-        val response = call.execute()
+        val response = call.await()
         return response.result("Error calling /removeKey") { }
     }
 
