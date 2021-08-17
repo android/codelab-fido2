@@ -17,14 +17,10 @@
 package com.example.android.fido2.repository
 
 import android.app.PendingIntent
-import android.content.Context
-import android.content.Intent
 import android.content.SharedPreferences
 import android.util.Log
 import androidx.annotation.WorkerThread
 import androidx.core.content.edit
-import androidx.lifecycle.LiveData
-import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.asFlow
 import androidx.lifecycle.map
 import com.example.android.fido2.api.ApiException
@@ -32,22 +28,15 @@ import com.example.android.fido2.api.ApiResult
 import com.example.android.fido2.api.AuthApi
 import com.example.android.fido2.api.Credential
 import com.example.android.fido2.toBase64
-import com.google.android.gms.fido.Fido
 import com.google.android.gms.fido.fido2.Fido2ApiClient
-import com.google.android.gms.fido.fido2.api.common.AuthenticatorAssertionResponse
-import com.google.android.gms.fido.fido2.api.common.AuthenticatorAttestationResponse
 import com.google.android.gms.fido.fido2.api.common.PublicKeyCredential
-import com.google.android.gms.tasks.Tasks
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
-import java.util.concurrent.Executor
-import java.util.concurrent.Executors
 import javax.inject.Inject
 import javax.inject.Singleton
 

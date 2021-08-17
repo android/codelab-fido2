@@ -45,9 +45,7 @@ import okhttp3.ResponseBody
 import ru.gildor.coroutines.okhttp.await
 import java.io.StringReader
 import java.io.StringWriter
-import java.util.concurrent.TimeUnit
 import javax.inject.Inject
-import javax.inject.Singleton
 
 /**
  * Interacts with the server API.

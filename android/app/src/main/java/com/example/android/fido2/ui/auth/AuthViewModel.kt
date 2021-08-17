@@ -17,11 +17,7 @@
 package com.example.android.fido2.ui.auth
 
 import android.app.PendingIntent
-import androidx.lifecycle.LiveData
-import androidx.lifecycle.MediatorLiveData
-import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.map
 import androidx.lifecycle.viewModelScope
 import com.example.android.fido2.repository.AuthRepository
 import com.example.android.fido2.repository.SignInState

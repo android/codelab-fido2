@@ -17,9 +17,7 @@
 package com.example.android.fido2.ui.auth
 
 import android.app.Activity
-import android.content.Intent
 import android.os.Bundle
-import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -33,7 +31,6 @@ import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
 import com.example.android.fido2.R
 import com.example.android.fido2.databinding.AuthFragmentBinding
-import com.example.android.fido2.ui.observeOnce
 import com.google.android.gms.fido.Fido
 import com.google.android.gms.fido.fido2.api.common.AuthenticatorErrorResponse
 import com.google.android.gms.fido.fido2.api.common.PublicKeyCredential

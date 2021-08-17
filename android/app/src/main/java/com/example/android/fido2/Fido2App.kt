@@ -20,8 +20,6 @@ import android.app.Application
 import android.content.Context
 import android.content.SharedPreferences
 import com.example.android.fido2.api.AddHeaderInterceptor
-import com.example.android.fido2.api.AuthApi
-import com.example.android.fido2.repository.AuthRepository
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
