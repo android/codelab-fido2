@@ -16,12 +16,18 @@
 
 package com.example.android.fido2.ui.username
 
-import androidx.lifecycle.LiveData
-import androidx.lifecycle.MediatorLiveData
-import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import com.example.android.fido2.repository.AuthRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.shareIn
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
@@ -29,33 +35,26 @@ class UsernameViewModel @Inject constructor(
     private val repository: AuthRepository
 ) : ViewModel() {
 
-    private val _sending = MutableLiveData<Boolean>()
-    val sending: LiveData<Boolean>
-        get() = _sending
+    private val _sending = MutableStateFlow(false)
+    val sending = _sending.asStateFlow()
 
-    val username = MutableLiveData<String>()
+    val username = MutableStateFlow("")
 
-    val nextEnabled = MediatorLiveData<Boolean>().apply {
-        var sendingValue = _sending.value ?: false
-        var usernameValue = username.value
-        fun update() {
-            value = !sendingValue && !usernameValue.isNullOrBlank()
-        }
-        addSource(_sending) {
-            sendingValue = it
-            update()
-        }
-        addSource(username) {
-            usernameValue = it
-            update()
-        }
-    }
+    val nextEnabled = combine(sending, username) { isSending, username ->
+        !isSending && username.isNotBlank()
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(), false)
 
     fun sendUsername() {
         val username = username.value
-        if (username != null && username.isNotBlank()) {
-            repository.username(username, _sending)
+        if (username.isNotBlank()) {
+            viewModelScope.launch {
+                _sending.value = true
+                try {
+                    repository.username(username)
+                } finally {
+                    _sending.value = false
+                }
+            }
         }
     }
-
 }

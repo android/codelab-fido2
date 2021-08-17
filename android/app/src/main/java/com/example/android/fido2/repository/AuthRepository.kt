@@ -112,21 +112,15 @@ class AuthRepository @Inject constructor(
      * Sends the username to the server. If it succeeds, the sign-in state will proceed to
      * [SignInState.SigningIn].
      */
-    fun username(username: String, sending: MutableLiveData<Boolean>) {
-        executor.execute {
-            sending.postValue(true)
-            try {
-                when (val result = api.username(username)) {
-                    ApiResult.SignedOutFromServer -> forceSignOut()
-                    is ApiResult.Success -> {
-                        prefs.edit(commit = true) {
-                            putString(PREF_USERNAME, username)
-                            putString(PREF_SESSION_ID, result.sessionId!!)
-                        }
-                        invokeSignInStateListeners(SignInState.SigningIn(username))                    }
+    suspend fun username(username: String) {
+        when (val result = api.username(username)) {
+            ApiResult.SignedOutFromServer -> forceSignOut()
+            is ApiResult.Success -> {
+                prefs.edit(commit = true) {
+                    putString(PREF_USERNAME, username)
+                    putString(PREF_SESSION_ID, result.sessionId!!)
                 }
-            } finally {
-                sending.postValue(false)
+                invokeSignInStateListeners(SignInState.SigningIn(username))
             }
         }
     }
