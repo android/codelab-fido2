@@ -27,6 +27,7 @@ import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.map
 import com.example.android.fido2.api.ApiException
+import com.example.android.fido2.api.ApiResult
 import com.example.android.fido2.api.AuthApi
 import com.example.android.fido2.api.Credential
 import com.example.android.fido2.toBase64
@@ -123,12 +124,16 @@ class AuthRepository(
         executor.execute {
             sending.postValue(true)
             try {
-                val result = api.username(username)
-                prefs.edit(commit = true) {
-                    putString(PREF_USERNAME, username)
-                    putString(PREF_SESSION_ID, result.sessionId!!)
+                when (val result = api.username(username)) {
+                    ApiResult.SignedOutFromServer -> forceSignOut()
+                    is ApiResult.Success -> {
+                        prefs.edit(commit = true) {
+                            putString(PREF_USERNAME, username)
+                            putString(PREF_SESSION_ID, result.sessionId!!)
+                        }
+                        invokeSignInStateListeners(SignInState.SigningIn(username))
+                    }
                 }
-                invokeSignInStateListeners(SignInState.SigningIn(username))
             } finally {
                 sending.postValue(false)
             }
@@ -148,13 +153,17 @@ class AuthRepository(
             val username = prefs.getString(PREF_USERNAME, null)!!
             val sessionId = prefs.getString(PREF_SESSION_ID, null)!!
             try {
-                val result = api.password(sessionId, password)
-                prefs.edit(commit = true) {
-                    result.sessionId?.let {
-                        putString(PREF_SESSION_ID, it)
+                when (val result = api.password(sessionId, password)) {
+                    ApiResult.SignedOutFromServer -> forceSignOut()
+                    is ApiResult.Success -> {
+                        prefs.edit(commit = true) {
+                            result.sessionId?.let {
+                                putString(PREF_SESSION_ID, it)
+                            }
+                        }
+                        invokeSignInStateListeners(SignInState.SignedIn(username))
                     }
                 }
-                invokeSignInStateListeners(SignInState.SignedIn(username))
             } catch (e: ApiException) {
                 Log.e(TAG, "Invalid login credentials", e)
 
@@ -190,10 +199,14 @@ class AuthRepository(
     @WorkerThread
     private fun refreshCredentials() {
         val sessionId = prefs.getString(PREF_SESSION_ID, null)!!
-        val result = api.getKeys(sessionId)
-        prefs.edit(commit = true) {
-            result.sessionId?.let { putString(PREF_SESSION_ID, it) }
-            putStringSet(PREF_CREDENTIALS, result.data.toStringSet())
+        when (val result = api.getKeys(sessionId)) {
+            ApiResult.SignedOutFromServer -> forceSignOut()
+            is ApiResult.Success -> {
+                prefs.edit(commit = true) {
+                    result.sessionId?.let { putString(PREF_SESSION_ID, it) }
+                    putStringSet(PREF_CREDENTIALS, result.data.toStringSet())
+                }
+            }
         }
     }
 
@@ -236,6 +249,17 @@ class AuthRepository(
                 remove(PREF_CREDENTIALS)
             }
             invokeSignInStateListeners(SignInState.SignedOut)
+        }
+    }
+
+    private fun forceSignOut() {
+        executor.execute {
+            prefs.edit(commit = true) {
+                remove(PREF_USERNAME)
+                remove(PREF_SESSION_ID)
+                remove(PREF_CREDENTIALS)
+            }
+            invokeSignInStateListeners(SignInState.SignInError("Signed out from server."))
         }
     }
 
@@ -305,8 +329,10 @@ class AuthRepository(
             processing.postValue(true)
             try {
                 val sessionId = prefs.getString(PREF_SESSION_ID, null)!!
-                api.removeKey(sessionId, credentialId)
-                refreshCredentials()
+                when (api.removeKey(sessionId, credentialId)) {
+                    ApiResult.SignedOutFromServer -> forceSignOut()
+                    is ApiResult.Success -> refreshCredentials()
+                }
             } catch (e: ApiException) {
                 Log.e(TAG, "Cannot call removeKey", e)
             } finally {

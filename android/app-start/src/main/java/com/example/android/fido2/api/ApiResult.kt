@@ -16,16 +16,29 @@
 
 package com.example.android.fido2.api
 
-class ApiResult<T>(
+/**
+ * Represents the result of an API call.
+ */
+sealed class ApiResult<out R> {
 
     /**
-     * The session ID to be used for the subsequent API calls. Might be null if the API call does
-     * not return a new cookie.
+     * API returned successfully with data.
      */
-    val sessionId: String?,
+    class Success<T>(
+        /**
+         * The session ID to be used for the subsequent API calls.
+         * Might be null if the API call does not return a new cookie.
+         */
+        val sessionId: String?,
+
+        /**
+         * The result data.
+         */
+        val data: T
+    ) : ApiResult<T>()
 
     /**
-     * The result data.
+     * API returned unsuccessfully with code 401, and the user should be signed out.
      */
-    val data: T
-)
+    object SignedOutFromServer : ApiResult<Nothing>()
+}

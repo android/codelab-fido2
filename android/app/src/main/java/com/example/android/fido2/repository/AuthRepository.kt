@@ -27,6 +27,7 @@ import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.map
 import com.example.android.fido2.api.ApiException
+import com.example.android.fido2.api.ApiResult
 import com.example.android.fido2.api.AuthApi
 import com.example.android.fido2.api.Credential
 import com.example.android.fido2.toBase64
@@ -123,12 +124,15 @@ class AuthRepository(
         executor.execute {
             sending.postValue(true)
             try {
-                val result = api.username(username)
-                prefs.edit(commit = true) {
-                    putString(PREF_USERNAME, username)
-                    putString(PREF_SESSION_ID, result.sessionId!!)
+                when (val result = api.username(username)) {
+                    ApiResult.SignedOutFromServer -> forceSignOut()
+                    is ApiResult.Success -> {
+                        prefs.edit(commit = true) {
+                            putString(PREF_USERNAME, username)
+                            putString(PREF_SESSION_ID, result.sessionId!!)
+                        }
+                        invokeSignInStateListeners(SignInState.SigningIn(username))                    }
                 }
-                invokeSignInStateListeners(SignInState.SigningIn(username))
             } finally {
                 sending.postValue(false)
             }
@@ -148,13 +152,17 @@ class AuthRepository(
             val username = prefs.getString(PREF_USERNAME, null)!!
             val sessionId = prefs.getString(PREF_SESSION_ID, null)!!
             try {
-                val result = api.password(sessionId, password)
-                prefs.edit(commit = true) {
-                    result.sessionId?.let {
-                        putString(PREF_SESSION_ID, it)
+                when (val result = api.password(sessionId, password)) {
+                    ApiResult.SignedOutFromServer -> forceSignOut()
+                    is ApiResult.Success -> {
+                        prefs.edit(commit = true) {
+                            result.sessionId?.let {
+                                putString(PREF_SESSION_ID, it)
+                            }
+                        }
+                        invokeSignInStateListeners(SignInState.SignedIn(username))
                     }
                 }
-                invokeSignInStateListeners(SignInState.SignedIn(username))
             } catch (e: ApiException) {
                 Log.e(TAG, "Invalid login credentials", e)
 
@@ -190,10 +198,14 @@ class AuthRepository(
     @WorkerThread
     private fun refreshCredentials() {
         val sessionId = prefs.getString(PREF_SESSION_ID, null)!!
-        val result = api.getKeys(sessionId)
-        prefs.edit(commit = true) {
-            result.sessionId?.let { putString(PREF_SESSION_ID, it) }
-            putStringSet(PREF_CREDENTIALS, result.data.toStringSet())
+        when (val result = api.getKeys(sessionId)) {
+            ApiResult.SignedOutFromServer -> forceSignOut()
+            is ApiResult.Success -> {
+                prefs.edit(commit = true) {
+                    result.sessionId?.let { putString(PREF_SESSION_ID, it) }
+                    putStringSet(PREF_CREDENTIALS, result.data.toStringSet())
+                }
+            }
         }
     }
 
@@ -239,6 +251,17 @@ class AuthRepository(
         }
     }
 
+    private fun forceSignOut() {
+        executor.execute {
+            prefs.edit(commit = true) {
+                remove(PREF_USERNAME)
+                remove(PREF_SESSION_ID)
+                remove(PREF_CREDENTIALS)
+            }
+            invokeSignInStateListeners(SignInState.SignInError("Signed out by server"))
+        }
+    }
+
     /**
      * Starts to register a new credential to the server. This should be called only when the
      * sign-in state is [SignInState.SignedIn].
@@ -250,12 +273,16 @@ class AuthRepository(
                 processing.postValue(true)
                 try {
                     val sessionId = prefs.getString(PREF_SESSION_ID, null)!!
-                    val apiResult = api.registerRequest(sessionId)
-                    prefs.edit(commit = true) {
-                        apiResult.sessionId?.let { putString(PREF_SESSION_ID, it) }
+                    when (val apiResult = api.registerRequest(sessionId)) {
+                        ApiResult.SignedOutFromServer -> forceSignOut()
+                        is ApiResult.Success -> {
+                            prefs.edit(commit = true) {
+                                apiResult.sessionId?.let { putString(PREF_SESSION_ID, it) }
+                            }
+                            val task = client.getRegisterPendingIntent(apiResult.data)
+                            result.postValue(Tasks.await(task))
+                        }
                     }
-                    val task = client.getRegisterPendingIntent(apiResult.data)
-                    result.postValue(Tasks.await(task))
                 } catch (e: Exception) {
                     Log.e(TAG, "Cannot call registerRequest", e)
                 } finally {
@@ -279,11 +306,15 @@ class AuthRepository(
                     data.getByteArrayExtra(Fido.FIDO2_KEY_RESPONSE_EXTRA)!!
                 )
                 val credentialId = response.keyHandle.toBase64()
-                val result = api.registerResponse(sessionId, response)
-                prefs.edit {
-                    result.sessionId?.let { putString(PREF_SESSION_ID, it) }
-                    putStringSet(PREF_CREDENTIALS, result.data.toStringSet())
-                    putString(PREF_LOCAL_CREDENTIAL_ID, credentialId)
+                when (val result = api.registerResponse(sessionId, response)) {
+                    ApiResult.SignedOutFromServer -> forceSignOut()
+                    is ApiResult.Success -> {
+                        prefs.edit {
+                            result.sessionId?.let { putString(PREF_SESSION_ID, it) }
+                            putStringSet(PREF_CREDENTIALS, result.data.toStringSet())
+                            putString(PREF_LOCAL_CREDENTIAL_ID, credentialId)
+                        }
+                    }
                 }
             } catch (e: ApiException) {
                 Log.e(TAG, "Cannot call registerResponse", e)
@@ -301,8 +332,10 @@ class AuthRepository(
             processing.postValue(true)
             try {
                 val sessionId = prefs.getString(PREF_SESSION_ID, null)!!
-                api.removeKey(sessionId, credentialId)
-                refreshCredentials()
+                when (api.removeKey(sessionId, credentialId)) {
+                    ApiResult.SignedOutFromServer -> forceSignOut()
+                    is ApiResult.Success -> refreshCredentials()
+                }
             } catch (e: ApiException) {
                 Log.e(TAG, "Cannot call removeKey", e)
             } finally {
@@ -324,9 +357,13 @@ class AuthRepository(
                     val sessionId = prefs.getString(PREF_SESSION_ID, null)!!
                     val credentialId = prefs.getString(PREF_LOCAL_CREDENTIAL_ID, null)
                     if (credentialId != null) {
-                        val apiResult = api.signinRequest(sessionId, credentialId)
-                        val task = client.getSignPendingIntent(apiResult.data)
-                        result.postValue(Tasks.await(task))
+                        when (val apiResult = api.signinRequest(sessionId, credentialId)) {
+                            ApiResult.SignedOutFromServer -> forceSignOut()
+                            is ApiResult.Success -> {
+                                val task = client.getSignPendingIntent(apiResult.data)
+                                result.postValue(Tasks.await(task))
+                            }
+                        }
                     }
                 } finally {
                     processing.postValue(false)
@@ -350,13 +387,17 @@ class AuthRepository(
                     data.getByteArrayExtra(Fido.FIDO2_KEY_RESPONSE_EXTRA)
                 )
                 val credentialId = response.keyHandle.toBase64()
-                val result = api.signinResponse(sessionId, response)
-                prefs.edit(commit = true) {
-                    result.sessionId?.let { putString(PREF_SESSION_ID, it) }
-                    putStringSet(PREF_CREDENTIALS, result.data.toStringSet())
-                    putString(PREF_LOCAL_CREDENTIAL_ID, credentialId)
+                when (val result = api.signinResponse(sessionId, response)) {
+                    ApiResult.SignedOutFromServer -> forceSignOut()
+                    is ApiResult.Success -> {
+                        prefs.edit(commit = true) {
+                            result.sessionId?.let { putString(PREF_SESSION_ID, it) }
+                            putStringSet(PREF_CREDENTIALS, result.data.toStringSet())
+                            putString(PREF_LOCAL_CREDENTIAL_ID, credentialId)
+                        }
+                        invokeSignInStateListeners(SignInState.SignedIn(username))
+                    }
                 }
-                invokeSignInStateListeners(SignInState.SignedIn(username))
             } catch (e: ApiException) {
                 Log.e(TAG, "Cannot call registerResponse", e)
             } finally {
