@@ -25,9 +25,9 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.HiltAndroidApp
 import dagger.hilt.components.SingletonComponent
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
 import okhttp3.OkHttpClient
-import java.util.concurrent.Executor
-import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import javax.inject.Singleton
 
@@ -51,7 +51,7 @@ object AppModule {
 
     @Singleton
     @Provides
-    fun provideExecutor() : Executor = Executors.newFixedThreadPool(64)
+    fun provideAppCoroutineScope() : CoroutineScope = CoroutineScope(SupervisorJob())
 
     @Singleton
     @Provides

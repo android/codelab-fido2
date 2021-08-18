@@ -17,9 +17,7 @@
 package com.example.android.fido2.ui.home
 
 import android.app.Activity
-import android.content.Intent
 import android.os.Bundle
-import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -30,14 +28,15 @@ import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
-import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.lifecycle.lifecycleScope
 import com.example.android.fido2.R
 import com.example.android.fido2.databinding.HomeFragmentBinding
-import com.example.android.fido2.ui.observeOnce
 import com.google.android.gms.fido.Fido
 import com.google.android.gms.fido.fido2.api.common.AuthenticatorErrorResponse
 import com.google.android.gms.fido.fido2.api.common.PublicKeyCredential
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.launch
 
 @AndroidEntryPoint
 class HomeFragment : Fragment(), DeleteConfirmationFragment.Listener {
@@ -67,16 +66,16 @@ class HomeFragment : Fragment(), DeleteConfirmationFragment.Listener {
             DeleteConfirmationFragment.newInstance(credentialId)
                 .show(childFragmentManager, FRAGMENT_DELETE_CONFIRMATION)
         }
-        binding.credentials.run {
-            layoutManager = LinearLayoutManager(view.context)
-            adapter = credentialAdapter
-        }
-        viewModel.credentials.observe(viewLifecycleOwner) { credentials ->
-            credentialAdapter.submitList(credentials)
-            binding.emptyCredentials.visibility = if (credentials.isEmpty()) {
-                View.VISIBLE
-            } else {
-                View.INVISIBLE
+        binding.credentials.adapter = credentialAdapter
+
+        viewLifecycleOwner.lifecycleScope.launchWhenStarted {
+            viewModel.credentials.collect { credentials ->
+                credentialAdapter.submitList(credentials)
+                binding.emptyCredentials.visibility = if (credentials.isEmpty()) {
+                    View.VISIBLE
+                } else {
+                    View.INVISIBLE
+                }
             }
         }
 
@@ -101,21 +100,26 @@ class HomeFragment : Fragment(), DeleteConfirmationFragment.Listener {
             ::handleCreateCredentialResult
         )
 
-        viewModel.processing.observe(viewLifecycleOwner) { processing ->
-            if (processing) {
-                binding.processing.show()
-            } else {
-                binding.processing.hide()
+        viewLifecycleOwner.lifecycleScope.launchWhenStarted {
+            viewModel.processing.collect { processing ->
+                if (processing) {
+                    binding.processing.show()
+                } else {
+                    binding.processing.hide()
+                }
             }
         }
 
         // FAB
         binding.add.setOnClickListener {
-            viewModel.registerRequest().observeOnce(requireActivity()) { intent ->
+            lifecycleScope.launch {
+                val intent = viewModel.registerRequest()
+                if (intent != null) {
 
-                // TODO(2): Open the fingerprint dialog.
-                // - Open the fingerprint dialog by launching the intent from FIDO2 API.
+                    // TODO(2): Open the fingerprint dialog.
+                    // - Open the fingerprint dialog by launching the intent from FIDO2 API.
 
+                }
             }
         }
     }
