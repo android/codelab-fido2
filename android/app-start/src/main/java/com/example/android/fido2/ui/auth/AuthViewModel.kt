@@ -18,8 +18,6 @@ package com.example.android.fido2.ui.auth
 
 import android.app.PendingIntent
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.asFlow
-import androidx.lifecycle.map
 import androidx.lifecycle.viewModelScope
 import com.example.android.fido2.repository.AuthRepository
 import com.example.android.fido2.repository.SignInState
@@ -30,6 +28,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -65,13 +64,13 @@ class AuthViewModel @Inject constructor(
         }
     }
 
-    val currentUsername = repository.getSignInState().map { state ->
+    val currentUsername = repository.signInState.map { state ->
         when (state) {
             is SignInState.SigningIn -> state.username
             is SignInState.SignedIn -> state.username
             else -> "(user)"
         }
-    }.asFlow().stateIn(viewModelScope, SharingStarted.WhileSubscribed(), "(user)")
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(), "(user)")
 
     fun auth() {
         viewModelScope.launch {

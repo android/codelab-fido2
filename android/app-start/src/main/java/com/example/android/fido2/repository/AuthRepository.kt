@@ -20,7 +20,6 @@ import android.app.PendingIntent
 import android.content.SharedPreferences
 import android.util.Log
 import androidx.core.content.edit
-import androidx.lifecycle.LiveData
 import androidx.lifecycle.asFlow
 import androidx.lifecycle.map
 import com.example.android.fido2.api.ApiException
@@ -30,7 +29,10 @@ import com.example.android.fido2.api.Credential
 import com.google.android.gms.fido.fido2.Fido2ApiClient
 import com.google.android.gms.fido.fido2.api.common.PublicKeyCredential
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -62,42 +64,22 @@ class AuthRepository @Inject constructor(
         fido2ApiClient = client
     }
 
-    private val signInStateListeners = mutableListOf<(SignInState) -> Unit>()
+    private val signInStateMutable = MutableSharedFlow<SignInState>(
+        replay = 1,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST
+    )
+    val signInState = signInStateMutable.asSharedFlow()
 
-    private fun invokeSignInStateListeners(state: SignInState) {
-        val listeners = signInStateListeners.toList() // Copy
-        for (listener in listeners) {
-            listener(state)
-        }
-    }
-
-    /**
-     * Returns the current sign-in state of the user. The UI uses this to navigate between screens.
-     */
-    fun getSignInState(): LiveData<SignInState> {
-        return object : LiveData<SignInState>() {
-
-            private val listener = { state: SignInState ->
-                postValue(state)
+    init {
+        scope.launch {
+            val username = prefs.getString(PREF_USERNAME, null)
+            val sessionId = prefs.getString(PREF_SESSION_ID, null)
+            val initialState = when {
+                username.isNullOrBlank() -> SignInState.SignedOut
+                sessionId.isNullOrBlank() -> SignInState.SigningIn(username)
+                else -> SignInState.SignedIn(username)
             }
-
-            init {
-                val username = prefs.getString(PREF_USERNAME, null)
-                val sessionId = prefs.getString(PREF_SESSION_ID, null)
-                value = when {
-                    username.isNullOrBlank() -> SignInState.SignedOut
-                    sessionId.isNullOrBlank() -> SignInState.SigningIn(username)
-                    else -> SignInState.SignedIn(username)
-                }
-            }
-
-            override fun onActive() {
-                signInStateListeners.add(listener)
-            }
-
-            override fun onInactive() {
-                signInStateListeners.remove(listener)
-            }
+            signInStateMutable.emit(initialState)
         }
     }
 
@@ -113,7 +95,7 @@ class AuthRepository @Inject constructor(
                     putString(PREF_USERNAME, username)
                     putString(PREF_SESSION_ID, result.sessionId!!)
                 }
-                invokeSignInStateListeners(SignInState.SigningIn(username))
+                signInStateMutable.emit(SignInState.SigningIn(username))
             }
         }
     }
@@ -135,7 +117,7 @@ class AuthRepository @Inject constructor(
                             putString(PREF_SESSION_ID, it)
                         }
                     }
-                    invokeSignInStateListeners(SignInState.SignedIn(username))
+                    signInStateMutable.emit(SignInState.SignedIn(username))
                 }
             }
         } catch (e: ApiException) {
@@ -148,7 +130,7 @@ class AuthRepository @Inject constructor(
                 remove(PREF_CREDENTIALS)
             }
 
-            invokeSignInStateListeners(
+            signInStateMutable.emit(
                 SignInState.SignInError(e.message ?: "Invalid login credentials")
             )
         }
@@ -202,7 +184,7 @@ class AuthRepository @Inject constructor(
         prefs.edit(commit = true) {
             remove(PREF_CREDENTIALS)
         }
-        invokeSignInStateListeners(SignInState.SigningIn(username))
+        signInStateMutable.emit(SignInState.SigningIn(username))
     }
 
     /**
@@ -215,18 +197,16 @@ class AuthRepository @Inject constructor(
             remove(PREF_SESSION_ID)
             remove(PREF_CREDENTIALS)
         }
-        invokeSignInStateListeners(SignInState.SignedOut)
+        signInStateMutable.emit(SignInState.SignedOut)
     }
 
-    private fun forceSignOut() {
-        executor.execute {
-            prefs.edit(commit = true) {
-                remove(PREF_USERNAME)
-                remove(PREF_SESSION_ID)
-                remove(PREF_CREDENTIALS)
-            }
-            invokeSignInStateListeners(SignInState.SignInError("Signed out from server."))
+    private suspend fun forceSignOut() {
+        prefs.edit(commit = true) {
+            remove(PREF_USERNAME)
+            remove(PREF_SESSION_ID)
+            remove(PREF_CREDENTIALS)
         }
+        signInStateMutable.emit(SignInState.SignInError("Signed out from server."))
     }
 
     /**
