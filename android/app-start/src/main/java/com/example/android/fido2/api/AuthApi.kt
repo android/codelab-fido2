@@ -83,7 +83,7 @@ class AuthApi @Inject constructor(
      * @param password A password.
      * @return An [ApiResult].
      */
-    fun password(sessionId: String, password: String): ApiResult<Unit> {
+    suspend fun password(sessionId: String, password: String): ApiResult<Unit> {
         val call = client.newCall(
             Request.Builder()
                 .url("$BASE_URL/password")
@@ -93,7 +93,7 @@ class AuthApi @Inject constructor(
                 })
                 .build()
         )
-        val response = call.execute()
+        val response = call.await()
         return response.result("Error calling /password") { }
     }
 

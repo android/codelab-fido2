@@ -17,16 +17,22 @@
 package com.example.android.fido2.ui.auth
 
 import android.app.PendingIntent
-import android.content.Intent
-import androidx.lifecycle.LiveData
-import androidx.lifecycle.MediatorLiveData
-import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.asFlow
 import androidx.lifecycle.map
+import androidx.lifecycle.viewModelScope
 import com.example.android.fido2.repository.AuthRepository
 import com.example.android.fido2.repository.SignInState
 import com.google.android.gms.fido.fido2.api.common.PublicKeyCredential
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
@@ -34,42 +40,59 @@ class AuthViewModel @Inject constructor(
     private val repository: AuthRepository
 ) : ViewModel() {
 
-    val password = MutableLiveData<String>()
+    val password = MutableStateFlow("")
 
-    private val _processing = MutableLiveData<Boolean>()
-    val processing: LiveData<Boolean>
-        get() = _processing
+    private val _processing = MutableStateFlow(false)
+    val processing = _processing.asStateFlow()
 
-    private val _errorMessage = MutableLiveData<String>()
-    val errorMessage: LiveData<String>
-        get() = _errorMessage
+    private val _errorMessage = MutableStateFlow<String?>(null)
+    val errorMessage = _errorMessage.asStateFlow()
 
-    val signInEnabled = MediatorLiveData<Boolean>().apply {
-        fun update(processing: Boolean, password: String) {
-            value = !processing && password.isNotBlank()
+    val signInEnabled = combine(processing, password) { isProcessing, password ->
+        !isProcessing && password.isNotBlank()
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    private val signinRequestChannel = Channel<PendingIntent>(capacity = Channel.CONFLATED)
+    val signinRequests = signinRequestChannel.receiveAsFlow()
+
+    init {
+        // See if we can authenticate using FIDO.
+        viewModelScope.launch {
+            val intent = repository.signinRequest()
+            if (intent != null) {
+                signinRequestChannel.send(intent)
+            }
         }
-        addSource(_processing) { update(it, password.value ?: "") }
-        addSource(password) { update(_processing.value == true, it) }
     }
 
-    fun signinRequest(): LiveData<PendingIntent?> {
-        return repository.signinRequest(_processing)
-    }
-
-    val currentUsername: LiveData<String> = repository.getSignInState().map { state ->
+    val currentUsername = repository.getSignInState().map { state ->
         when (state) {
             is SignInState.SigningIn -> state.username
             is SignInState.SignedIn -> state.username
             else -> "(user)"
         }
-    }
+    }.asFlow().stateIn(viewModelScope, SharingStarted.WhileSubscribed(), "(user)")
 
     fun auth() {
-        repository.password(password.value ?: "", _processing)
+        viewModelScope.launch {
+            _processing.value = true
+            try {
+                repository.password(password.value)
+            } finally {
+                _processing.value = false
+            }
+        }
     }
 
     fun signinResponse(credential: PublicKeyCredential) {
-        repository.signinResponse(credential, _processing)
+        viewModelScope.launch {
+            _processing.value = true
+            try {
+                repository.signinResponse(credential)
+            } finally {
+                _processing.value = false
+            }
+        }
     }
 
 }

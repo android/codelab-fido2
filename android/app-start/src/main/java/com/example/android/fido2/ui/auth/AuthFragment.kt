@@ -28,13 +28,15 @@ import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
+import androidx.lifecycle.lifecycleScope
 import com.example.android.fido2.R
 import com.example.android.fido2.databinding.AuthFragmentBinding
-import com.example.android.fido2.ui.observeOnce
 import com.google.android.gms.fido.Fido
 import com.google.android.gms.fido.fido2.api.common.AuthenticatorErrorResponse
 import com.google.android.gms.fido.fido2.api.common.PublicKeyCredential
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.launch
 
 @AndroidEntryPoint
 class AuthFragment : Fragment() {
@@ -61,18 +63,23 @@ class AuthFragment : Fragment() {
             ::handleSignResult
         )
 
-        viewModel.signinRequest().observeOnce(this) { intent ->
+        viewLifecycleOwner.lifecycleScope.launchWhenStarted {
+            launch {
+                viewModel.signinRequests.collect { intent ->
 
-            // TODO(5): Open the fingerprint dialog.
-            // - Open the fingerprint dialog by launching the intent from FIDO2 API.
+                    // TODO(5): Open the fingerprint dialog.
+                    // - Open the fingerprint dialog by launching the intent from FIDO2 API.
 
-        }
-
-        viewModel.processing.observe(viewLifecycleOwner) { processing ->
-            if (processing) {
-                binding.processing.show()
-            } else {
-                binding.processing.hide()
+                }
+            }
+            launch {
+                viewModel.processing.collect { processing ->
+                    if (processing) {
+                        binding.processing.show()
+                    } else {
+                        binding.processing.hide()
+                    }
+                }
             }
         }
     }
