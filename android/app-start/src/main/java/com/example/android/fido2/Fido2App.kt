@@ -17,8 +17,10 @@
 package com.example.android.fido2
 
 import android.app.Application
-import android.content.Context
-import android.content.SharedPreferences
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.PreferenceDataStoreFactory
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.preferencesDataStoreFile
 import com.example.android.fido2.api.AddHeaderInterceptor
 import dagger.Module
 import dagger.Provides
@@ -55,7 +57,9 @@ object AppModule {
 
     @Singleton
     @Provides
-    fun provideSharedPreferences(application: Application) : SharedPreferences {
-        return application.getSharedPreferences("auth", Context.MODE_PRIVATE)
+    fun provideDataStore(application: Application) : DataStore<Preferences> {
+        return PreferenceDataStoreFactory.create {
+            application.preferencesDataStoreFile("auth")
+        }
     }
 }
