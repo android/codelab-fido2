@@ -3,7 +3,7 @@
  * Copyright 2019 Google Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
+ * you may not use this file except in compliance with the License. 
  * You may obtain a copy of the License at
  *
  *     https://www.apache.org/licenses/LICENSE-2.0
@@ -53,7 +53,7 @@ export const registerCredential = async () => {
   options.challenge = base64url.decode(options.challenge);
 
   if (options.excludeCredentials) {
-    for (let cred of options.excludeCredentials) {
+    for (let cred of options.excludeCredentials) { 
       cred.id = base64url.decode(cred.id);
     }
   }
