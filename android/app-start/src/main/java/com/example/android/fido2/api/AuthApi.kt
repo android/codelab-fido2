@@ -44,11 +44,14 @@ import okhttp3.ResponseBody
 import java.io.StringReader
 import java.io.StringWriter
 import java.util.concurrent.TimeUnit
+import javax.inject.Inject
 
 /**
  * Interacts with the server API.
  */
-class AuthApi {
+class AuthApi @Inject constructor(
+    private val client: OkHttpClient
+) {
 
     companion object {
         private const val BASE_URL = BuildConfig.API_BASE_URL
@@ -56,13 +59,6 @@ class AuthApi {
         private const val SessionIdKey = "connect.sid="
         private const val TAG = "AuthApi"
     }
-
-    private val client = OkHttpClient.Builder()
-        .addInterceptor(AddHeaderInterceptor())
-        .readTimeout(30, TimeUnit.SECONDS)
-        .writeTimeout(40, TimeUnit.SECONDS)
-        .connectTimeout(40, TimeUnit.SECONDS)
-        .build()
 
     /**
      * @param username The username to be used for sign-in.

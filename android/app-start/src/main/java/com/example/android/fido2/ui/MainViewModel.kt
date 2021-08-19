@@ -14,16 +14,18 @@
  * limitations under the License.
  */
 
-package com.example.android.fido2
+package com.example.android.fido2.ui
 
-import android.app.Application
-import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.ViewModel
 import com.example.android.fido2.repository.AuthRepository
 import com.google.android.gms.fido.fido2.Fido2ApiClient
+import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
 
-class MainViewModel(application: Application) : AndroidViewModel(application) {
-
-    private val repository = AuthRepository.getInstance(application)
+@HiltViewModel
+class MainViewModel @Inject constructor(
+    private val repository: AuthRepository
+) : ViewModel() {
 
     val signInState = repository.getSignInState()
 
