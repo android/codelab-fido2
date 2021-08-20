@@ -24,6 +24,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.map
 import com.example.android.fido2.repository.AuthRepository
 import com.example.android.fido2.repository.SignInState
+import com.google.android.gms.fido.fido2.api.common.PublicKeyCredential
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 
@@ -58,8 +59,8 @@ class HomeViewModel @Inject constructor(
         return repository.registerRequest(_processing)
     }
 
-    fun registerResponse(data: Intent) {
-        repository.registerResponse(data, _processing)
+    fun registerResponse(credential: PublicKeyCredential) {
+        repository.registerResponse(credential, _processing)
     }
 
     fun removeKey(credentialId: String) {

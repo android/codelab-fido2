@@ -37,6 +37,7 @@ import com.example.android.fido2.databinding.HomeFragmentBinding
 import com.example.android.fido2.ui.observeOnce
 import com.google.android.gms.fido.Fido
 import com.google.android.gms.fido.fido2.api.common.AuthenticatorErrorResponse
+import com.google.android.gms.fido.fido2.api.common.PublicKeyCredential
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
@@ -122,20 +123,23 @@ class HomeFragment : Fragment(), DeleteConfirmationFragment.Listener {
     }
 
     private fun handleCreateCredentialResult(activityResult: ActivityResult) {
-        val data = activityResult.data
-        val errorExtra = data?.getByteArrayExtra(Fido.FIDO2_KEY_ERROR_EXTRA)
+        val bytes = activityResult.data?.getByteArrayExtra(Fido.FIDO2_KEY_CREDENTIAL_EXTRA)
         when {
-            errorExtra != null -> {
-                val error = AuthenticatorErrorResponse.deserializeFromBytes(errorExtra)
-                error.errorMessage?.let { errorMessage ->
-                    Toast.makeText(requireContext(), errorMessage, Toast.LENGTH_LONG).show()
-                    Log.e(TAG, errorMessage)
+            activityResult.resultCode != Activity.RESULT_OK ->
+                Toast.makeText(requireContext(), R.string.cancelled, Toast.LENGTH_LONG).show()
+            bytes == null ->
+                Toast.makeText(requireContext(), R.string.credential_error, Toast.LENGTH_LONG)
+                    .show()
+            else -> {
+                val credential = PublicKeyCredential.deserializeFromBytes(bytes)
+                val response = credential.response
+                if (response is AuthenticatorErrorResponse) {
+                    Toast.makeText(requireContext(), response.errorMessage, Toast.LENGTH_LONG)
+                        .show()
+                } else {
+                    viewModel.registerResponse(credential)
                 }
             }
-            activityResult.resultCode != Activity.RESULT_OK -> {
-                Toast.makeText(requireContext(), R.string.cancelled, Toast.LENGTH_SHORT).show()
-            }
-            data != null -> viewModel.registerResponse(data)
         }
     }
 }
