@@ -24,6 +24,10 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
+import androidx.activity.result.ActivityResult
+import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.result.IntentSenderRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import com.example.android.fido2.R
@@ -38,11 +42,12 @@ class AuthFragment : Fragment() {
 
     companion object {
         private const val TAG = "AuthFragment"
-        const val REQUEST_FIDO2_SIGNIN = 2
     }
 
     private val viewModel: AuthViewModel by viewModels()
     private lateinit var binding: AuthFragmentBinding
+
+    private lateinit var signIntentLauncher: ActivityResultLauncher<IntentSenderRequest>
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -56,6 +61,15 @@ class AuthFragment : Fragment() {
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        signIntentLauncher = registerForActivityResult(
+            ActivityResultContracts.StartIntentSenderForResult(),
+            ::handleSignResult
+        )
+
+        viewModel.signinRequest().observeOnce(this) { intent ->
+            signIntentLauncher.launch(IntentSenderRequest.Builder(intent).build())
+        }
+
         viewModel.processing.observe(viewLifecycleOwner) { processing ->
             if (processing) {
                 binding.processing.show()
@@ -65,40 +79,21 @@ class AuthFragment : Fragment() {
         }
     }
 
-    override fun onActivityCreated(savedInstanceState: Bundle?) {
-        super.onActivityCreated(savedInstanceState)
-        viewModel.signinRequest().observeOnce(this) { intent ->
-            startIntentSenderForResult(
-                intent.intentSender,
-                REQUEST_FIDO2_SIGNIN,
-                null,
-                0,
-                0,
-                0,
-                null
-            )
-        }
-    }
-
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        if (requestCode == REQUEST_FIDO2_SIGNIN) {
-            val errorExtra = data?.getByteArrayExtra(Fido.FIDO2_KEY_ERROR_EXTRA)
-            if (errorExtra != null) {
-                val error = AuthenticatorErrorResponse.deserializeFromBytes(errorExtra)
-                error.errorMessage?.let { errorMessage ->
-                    Toast.makeText(requireContext(), errorMessage, Toast.LENGTH_LONG).show()
-                    Log.e(TAG, errorMessage)
-                }
-            } else if (resultCode != Activity.RESULT_OK) {
-                Toast.makeText(requireContext(), R.string.cancelled, Toast.LENGTH_SHORT).show()
-            } else {
-                if (data != null) {
-                    viewModel.signinResponse(data)
-                }
+    private fun handleSignResult(activityResult: ActivityResult) {
+        val data = activityResult.data
+        val errorExtra = data?.getByteArrayExtra(Fido.FIDO2_KEY_ERROR_EXTRA)
+        if (errorExtra != null) {
+            val error = AuthenticatorErrorResponse.deserializeFromBytes(errorExtra)
+            error.errorMessage?.let { errorMessage ->
+                Toast.makeText(requireContext(), errorMessage, Toast.LENGTH_LONG).show()
+                Log.e(TAG, errorMessage)
             }
-
+        } else if (activityResult.resultCode != Activity.RESULT_OK) {
+            Toast.makeText(requireContext(), R.string.cancelled, Toast.LENGTH_SHORT).show()
         } else {
-            super.onActivityResult(requestCode, resultCode, data)
+            if (data != null) {
+                viewModel.signinResponse(data)
+            }
         }
     }
 }
