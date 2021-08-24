@@ -42,11 +42,10 @@ import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
 import okhttp3.ResponseBody
+import ru.gildor.coroutines.okhttp.await
 import java.io.StringReader
 import java.io.StringWriter
-import java.util.concurrent.TimeUnit
 import javax.inject.Inject
-import javax.inject.Singleton
 
 /**
  * Interacts with the server API.
@@ -66,7 +65,7 @@ class AuthApi @Inject constructor(
      * @param username The username to be used for sign-in.
      * @return The Session ID.
      */
-    fun username(username: String): ApiResult<Unit> {
+    suspend fun username(username: String): ApiResult<Unit> {
         val call = client.newCall(
             Request.Builder()
                 .url("$BASE_URL/username")
@@ -75,7 +74,7 @@ class AuthApi @Inject constructor(
                 })
                 .build()
         )
-        val response = call.execute()
+        val response = call.await()
         return response.result("Error calling /username") { }
     }
 
@@ -84,7 +83,7 @@ class AuthApi @Inject constructor(
      * @param password A password.
      * @return An [ApiResult].
      */
-    fun password(sessionId: String, password: String): ApiResult<Unit> {
+    suspend fun password(sessionId: String, password: String): ApiResult<Unit> {
         val call = client.newCall(
             Request.Builder()
                 .url("$BASE_URL/password")
@@ -94,7 +93,7 @@ class AuthApi @Inject constructor(
                 })
                 .build()
         )
-        val response = call.execute()
+        val response = call.await()
         return response.result("Error calling /password") { }
     }
 
@@ -102,7 +101,7 @@ class AuthApi @Inject constructor(
      * @param sessionId The session ID.
      * @return A list of all the credentials registered on the server.
      */
-    fun getKeys(sessionId: String): ApiResult<List<Credential>> {
+    suspend fun getKeys(sessionId: String): ApiResult<List<Credential>> {
         val call = client.newCall(
             Request.Builder()
                 .url("$BASE_URL/getKeys")
@@ -110,7 +109,7 @@ class AuthApi @Inject constructor(
                 .method("POST", jsonRequestBody {})
                 .build()
         )
-        val response = call.execute()
+        val response = call.await()
         return response.result("Error calling /getKeys") {
             parseUserCredentials(body ?: throw ApiException("Empty response from /getKeys"))
         }
@@ -122,7 +121,7 @@ class AuthApi @Inject constructor(
      * used for a subsequent FIDO2 API call. The `second` element is a challenge string that should
      * be sent back to the server in [registerResponse].
      */
-    fun registerRequest(sessionId: String): ApiResult<PublicKeyCredentialCreationOptions> {
+    suspend fun registerRequest(sessionId: String): ApiResult<PublicKeyCredentialCreationOptions> {
         val call = client.newCall(
             Request.Builder()
                 .url("$BASE_URL/registerRequest")
@@ -136,7 +135,7 @@ class AuthApi @Inject constructor(
                 })
                 .build()
         )
-        val response = call.execute()
+        val response = call.await()
         return response.result("Error calling /registerRequest") {
             parsePublicKeyCredentialCreationOptions(
                 body ?: throw ApiException("Empty response from /registerRequest")
@@ -150,7 +149,7 @@ class AuthApi @Inject constructor(
      * @return A list of all the credentials registered on the server, including the newly
      * registered one.
      */
-    fun registerResponse(
+    suspend fun registerResponse(
         sessionId: String,
         credential: PublicKeyCredential
     ): ApiResult<List<Credential>> {
@@ -176,7 +175,7 @@ class AuthApi @Inject constructor(
                 })
                 .build()
         )
-        val apiResponse = call.execute()
+        val apiResponse = call.await()
         return apiResponse.result("Error calling /registerResponse") {
             parseUserCredentials(
                 body ?: throw ApiException("Empty response from /registerResponse")
@@ -188,7 +187,7 @@ class AuthApi @Inject constructor(
      * @param sessionId The session ID.
      * @param credentialId The credential ID to be removed.
      */
-    fun removeKey(sessionId: String, credentialId: String): ApiResult<Unit> {
+    suspend fun removeKey(sessionId: String, credentialId: String): ApiResult<Unit> {
         val call = client.newCall(
             Request.Builder()
                 .url("$BASE_URL/removeKey?credId=$credentialId")
@@ -196,7 +195,7 @@ class AuthApi @Inject constructor(
                 .method("POST", jsonRequestBody {})
                 .build()
         )
-        val response = call.execute()
+        val response = call.await()
         return response.result("Error calling /removeKey") { }
     }
 
@@ -207,7 +206,7 @@ class AuthApi @Inject constructor(
      * for a subsequent FIDO2 API call. The `second` element is a challenge string that should
      * be sent back to the server in [signinResponse].
      */
-    fun signinRequest(
+    suspend fun signinRequest(
         sessionId: String,
         credentialId: String?
     ): ApiResult<PublicKeyCredentialRequestOptions> {
@@ -225,7 +224,7 @@ class AuthApi @Inject constructor(
                 .method("POST", jsonRequestBody {})
                 .build()
         )
-        val response = call.execute()
+        val response = call.await()
         return response.result("Error calling /signinRequest") {
             parsePublicKeyCredentialRequestOptions(
                 body ?: throw ApiException("Empty response from /signinRequest")
@@ -239,7 +238,7 @@ class AuthApi @Inject constructor(
      * @return A list of all the credentials registered on the server, including the newly
      * registered one.
      */
-    fun signinResponse(
+    suspend fun signinResponse(
         sessionId: String,
         credential: PublicKeyCredential
     ): ApiResult<List<Credential>> {
@@ -271,7 +270,7 @@ class AuthApi @Inject constructor(
                 })
                 .build()
         )
-        val apiResponse = call.execute()
+        val apiResponse = call.await()
         return apiResponse.result("Error calling /signingResponse") {
             parseUserCredentials(body ?: throw ApiException("Empty response from /signinResponse"))
         }
