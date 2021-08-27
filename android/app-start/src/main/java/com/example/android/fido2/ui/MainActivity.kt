@@ -22,6 +22,7 @@ import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.commit
+import androidx.lifecycle.lifecycleScope
 import com.example.android.fido2.R
 import com.example.android.fido2.repository.SignInState
 import com.example.android.fido2.ui.auth.AuthFragment
@@ -29,6 +30,7 @@ import com.example.android.fido2.ui.home.HomeFragment
 import com.example.android.fido2.ui.username.UsernameFragment
 import com.google.android.gms.fido.Fido
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.flow.collect
 
 @AndroidEntryPoint
 class MainActivity : AppCompatActivity() {
@@ -40,21 +42,23 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.main_activity)
         setSupportActionBar(findViewById(R.id.toolbar))
 
-        viewModel.signInState.observe(this) { state ->
-            when (state) {
-                is SignInState.SignedOut -> {
-                    showFragment(UsernameFragment::class.java) { UsernameFragment() }
-                }
-                is SignInState.SigningIn -> {
-                    showFragment(AuthFragment::class.java) { AuthFragment() }
-                }
-                is SignInState.SignInError -> {
-                    Toast.makeText(this, state.error, Toast.LENGTH_LONG).show()
-                    // return to username prompt
-                    showFragment(UsernameFragment::class.java) { UsernameFragment() }
-                }
-                is SignInState.SignedIn -> {
-                    showFragment(HomeFragment::class.java) { HomeFragment() }
+        lifecycleScope.launchWhenStarted {
+            viewModel.signInState.collect { state ->
+                when (state) {
+                    is SignInState.SignedOut -> {
+                        showFragment(UsernameFragment::class.java) { UsernameFragment() }
+                    }
+                    is SignInState.SigningIn -> {
+                        showFragment(AuthFragment::class.java) { AuthFragment() }
+                    }
+                    is SignInState.SignInError -> {
+                        Toast.makeText(this@MainActivity, state.error, Toast.LENGTH_LONG).show()
+                        // return to username prompt
+                        showFragment(UsernameFragment::class.java) { UsernameFragment() }
+                    }
+                    is SignInState.SignedIn -> {
+                        showFragment(HomeFragment::class.java) { HomeFragment() }
+                    }
                 }
             }
         }

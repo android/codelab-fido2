@@ -17,15 +17,18 @@
 package com.example.android.fido2.ui.home
 
 import android.app.PendingIntent
-import android.content.Intent
-import androidx.lifecycle.LiveData
-import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.map
+import androidx.lifecycle.viewModelScope
 import com.example.android.fido2.repository.AuthRepository
 import com.example.android.fido2.repository.SignInState
 import com.google.android.gms.fido.fido2.api.common.PublicKeyCredential
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
@@ -33,38 +36,60 @@ class HomeViewModel @Inject constructor(
     private val repository: AuthRepository
 ) : ViewModel() {
 
-    private val _processing = MutableLiveData<Boolean>()
-    val processing: LiveData<Boolean>
-        get() = _processing
+    private val _processing = MutableStateFlow(false)
+    val processing = _processing.asStateFlow()
 
-    val currentUsername: LiveData<String> = repository.getSignInState().map { state ->
+    val currentUsername = repository.signInState.map { state ->
         when (state) {
             is SignInState.SigningIn -> state.username
             is SignInState.SignedIn -> state.username
-            else -> "User"
+            else -> "(user)"
         }
-    }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(), "(user)")
 
     val credentials = repository.getCredentials()
 
     fun reauth() {
-        repository.clearCredentials()
+        viewModelScope.launch {
+            repository.clearCredentials()
+        }
     }
 
     fun signOut() {
-        repository.signOut()
+        viewModelScope.launch {
+            repository.signOut()
+        }
     }
 
-    fun registerRequest(): LiveData<PendingIntent?> {
-        return repository.registerRequest(_processing)
+    suspend fun registerRequest(): PendingIntent? {
+        _processing.value = true
+        try {
+            return repository.registerRequest()
+        } finally {
+            _processing.value = false
+        }
     }
 
     fun registerResponse(credential: PublicKeyCredential) {
-        repository.registerResponse(credential, _processing)
+        viewModelScope.launch {
+            _processing.value = true
+            try {
+                repository.registerResponse(credential)
+            } finally {
+                _processing.value = false
+            }
+        }
     }
 
     fun removeKey(credentialId: String) {
-        repository.removeKey(credentialId, _processing)
+        viewModelScope.launch {
+            _processing.value = true
+            try {
+                repository.removeKey(credentialId)
+            } finally {
+                _processing.value = false
+            }
+        }
     }
 
 }

@@ -99,7 +99,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_margin="@dimen/spacing_medium_large"
-            android:enabled="@{safeUnbox(viewModel.signInEnabled)}"
+            android:enabled="@{viewModel.signInEnabled}"
             android:onClick="@{() -> viewModel.auth()}"
             android:text="@string/sign_in"
             app:layout_constraintBottom_toBottomOf="parent"

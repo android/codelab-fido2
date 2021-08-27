@@ -17,28 +17,23 @@
 package com.example.android.fido2.repository
 
 import android.app.PendingIntent
-import android.content.Context
-import android.content.Intent
 import android.content.SharedPreferences
 import android.util.Log
-import androidx.annotation.WorkerThread
 import androidx.core.content.edit
-import androidx.lifecycle.LiveData
-import androidx.lifecycle.MutableLiveData
+import androidx.lifecycle.asFlow
 import androidx.lifecycle.map
 import com.example.android.fido2.api.ApiException
 import com.example.android.fido2.api.ApiResult
 import com.example.android.fido2.api.AuthApi
 import com.example.android.fido2.api.Credential
-import com.example.android.fido2.toBase64
-import com.google.android.gms.fido.Fido
 import com.google.android.gms.fido.fido2.Fido2ApiClient
-import com.google.android.gms.fido.fido2.api.common.AuthenticatorAssertionResponse
-import com.google.android.gms.fido.fido2.api.common.AuthenticatorAttestationResponse
 import com.google.android.gms.fido.fido2.api.common.PublicKeyCredential
-import com.google.android.gms.tasks.Tasks
-import java.util.concurrent.Executor
-import java.util.concurrent.Executors
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -49,7 +44,7 @@ import javax.inject.Singleton
 class AuthRepository @Inject constructor(
     private val api: AuthApi,
     private val prefs: SharedPreferences,
-    private val executor: Executor
+    private val scope: CoroutineScope
 ) {
 
     companion object {
@@ -69,42 +64,22 @@ class AuthRepository @Inject constructor(
         fido2ApiClient = client
     }
 
-    private val signInStateListeners = mutableListOf<(SignInState) -> Unit>()
+    private val signInStateMutable = MutableSharedFlow<SignInState>(
+        replay = 1,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST
+    )
+    val signInState = signInStateMutable.asSharedFlow()
 
-    private fun invokeSignInStateListeners(state: SignInState) {
-        val listeners = signInStateListeners.toList() // Copy
-        for (listener in listeners) {
-            listener(state)
-        }
-    }
-
-    /**
-     * Returns the current sign-in state of the user. The UI uses this to navigate between screens.
-     */
-    fun getSignInState(): LiveData<SignInState> {
-        return object : LiveData<SignInState>() {
-
-            private val listener = { state: SignInState ->
-                postValue(state)
+    init {
+        scope.launch {
+            val username = prefs.getString(PREF_USERNAME, null)
+            val sessionId = prefs.getString(PREF_SESSION_ID, null)
+            val initialState = when {
+                username.isNullOrBlank() -> SignInState.SignedOut
+                sessionId.isNullOrBlank() -> SignInState.SigningIn(username)
+                else -> SignInState.SignedIn(username)
             }
-
-            init {
-                val username = prefs.getString(PREF_USERNAME, null)
-                val sessionId = prefs.getString(PREF_SESSION_ID, null)
-                value = when {
-                    username.isNullOrBlank() -> SignInState.SignedOut
-                    sessionId.isNullOrBlank() -> SignInState.SigningIn(username)
-                    else -> SignInState.SignedIn(username)
-                }
-            }
-
-            override fun onActive() {
-                signInStateListeners.add(listener)
-            }
-
-            override fun onInactive() {
-                signInStateListeners.remove(listener)
-            }
+            signInStateMutable.emit(initialState)
         }
     }
 
@@ -112,22 +87,15 @@ class AuthRepository @Inject constructor(
      * Sends the username to the server. If it succeeds, the sign-in state will proceed to
      * [SignInState.SigningIn].
      */
-    fun username(username: String, sending: MutableLiveData<Boolean>) {
-        executor.execute {
-            sending.postValue(true)
-            try {
-                when (val result = api.username(username)) {
-                    ApiResult.SignedOutFromServer -> forceSignOut()
-                    is ApiResult.Success -> {
-                        prefs.edit(commit = true) {
-                            putString(PREF_USERNAME, username)
-                            putString(PREF_SESSION_ID, result.sessionId!!)
-                        }
-                        invokeSignInStateListeners(SignInState.SigningIn(username))
-                    }
+    suspend fun username(username: String) {
+        when (val result = api.username(username)) {
+            ApiResult.SignedOutFromServer -> forceSignOut()
+            is ApiResult.Success -> {
+                prefs.edit(commit = true) {
+                    putString(PREF_USERNAME, username)
+                    putString(PREF_SESSION_ID, result.sessionId!!)
                 }
-            } finally {
-                sending.postValue(false)
+                signInStateMutable.emit(SignInState.SigningIn(username))
             }
         }
     }
@@ -136,42 +104,35 @@ class AuthRepository @Inject constructor(
      * Signs in with a password. This should be called only when the sign-in state is
      * [SignInState.SigningIn]. If it succeeds, the sign-in state will proceed to
      * [SignInState.SignedIn].
-     *
-     * @param processing The value is set to `true` while the API call is ongoing.
      */
-    fun password(password: String, processing: MutableLiveData<Boolean>) {
-        executor.execute {
-            processing.postValue(true)
-            val username = prefs.getString(PREF_USERNAME, null)!!
-            val sessionId = prefs.getString(PREF_SESSION_ID, null)!!
-            try {
-                when (val result = api.password(sessionId, password)) {
-                    ApiResult.SignedOutFromServer -> forceSignOut()
-                    is ApiResult.Success -> {
-                        prefs.edit(commit = true) {
-                            result.sessionId?.let {
-                                putString(PREF_SESSION_ID, it)
-                            }
+    suspend fun password(password: String) {
+        val username = prefs.getString(PREF_USERNAME, null)!!
+        val sessionId = prefs.getString(PREF_SESSION_ID, null)!!
+        try {
+            when (val result = api.password(sessionId, password)) {
+                ApiResult.SignedOutFromServer -> forceSignOut()
+                is ApiResult.Success -> {
+                    prefs.edit(commit = true) {
+                        result.sessionId?.let {
+                            putString(PREF_SESSION_ID, it)
                         }
-                        invokeSignInStateListeners(SignInState.SignedIn(username))
                     }
+                    signInStateMutable.emit(SignInState.SignedIn(username))
                 }
-            } catch (e: ApiException) {
-                Log.e(TAG, "Invalid login credentials", e)
-
-                // start login over again
-                prefs.edit(commit = true) {
-                    remove(PREF_USERNAME)
-                    remove(PREF_SESSION_ID)
-                    remove(PREF_CREDENTIALS)
-                }
-
-                invokeSignInStateListeners(
-                    SignInState.SignInError(e.message ?: "Invalid login credentials")
-                )
-            } finally {
-                processing.postValue(false)
             }
+        } catch (e: ApiException) {
+            Log.e(TAG, "Invalid login credentials", e)
+
+            // start login over again
+            prefs.edit(commit = true) {
+                remove(PREF_USERNAME)
+                remove(PREF_SESSION_ID)
+                remove(PREF_CREDENTIALS)
+            }
+
+            signInStateMutable.emit(
+                SignInState.SignInError(e.message ?: "Invalid login credentials")
+            )
         }
     }
 
@@ -179,17 +140,16 @@ class AuthRepository @Inject constructor(
      * Retrieves the list of credential this user has registered on the server. This should be
      * called only when the sign-in state is [SignInState.SignedIn].
      */
-    fun getCredentials(): LiveData<List<Credential>> {
-        executor.execute {
+    fun getCredentials(): Flow<List<Credential>> {
+        scope.launch {
             refreshCredentials()
         }
         return prefs.liveStringSet(PREF_CREDENTIALS, emptySet()).map { set ->
             parseCredentials(set)
-        }
+        }.asFlow()
     }
 
-    @WorkerThread
-    private fun refreshCredentials() {
+    private suspend fun refreshCredentials() {
         val sessionId = prefs.getString(PREF_SESSION_ID, null)!!
         when (val result = api.getKeys(sessionId)) {
             ApiResult.SignedOutFromServer -> forceSignOut()
@@ -219,117 +179,95 @@ class AuthRepository @Inject constructor(
     /**
      * Clears the credentials. The sign-in state will proceed to [SignInState.SigningIn].
      */
-    fun clearCredentials() {
-        executor.execute {
-            val username = prefs.getString(PREF_USERNAME, null)!!
-            prefs.edit(commit = true) {
-                remove(PREF_CREDENTIALS)
-            }
-            invokeSignInStateListeners(SignInState.SigningIn(username))
+    suspend fun clearCredentials() {
+        val username = prefs.getString(PREF_USERNAME, null)!!
+        prefs.edit(commit = true) {
+            remove(PREF_CREDENTIALS)
         }
+        signInStateMutable.emit(SignInState.SigningIn(username))
     }
 
     /**
      * Clears all the sign-in information. The sign-in state will proceed to
      * [SignInState.SignedOut].
      */
-    fun signOut() {
-        executor.execute {
-            prefs.edit(commit = true) {
-                remove(PREF_USERNAME)
-                remove(PREF_SESSION_ID)
-                remove(PREF_CREDENTIALS)
-            }
-            invokeSignInStateListeners(SignInState.SignedOut)
+    suspend fun signOut() {
+        prefs.edit(commit = true) {
+            remove(PREF_USERNAME)
+            remove(PREF_SESSION_ID)
+            remove(PREF_CREDENTIALS)
         }
+        signInStateMutable.emit(SignInState.SignedOut)
     }
 
-    private fun forceSignOut() {
-        executor.execute {
-            prefs.edit(commit = true) {
-                remove(PREF_USERNAME)
-                remove(PREF_SESSION_ID)
-                remove(PREF_CREDENTIALS)
-            }
-            invokeSignInStateListeners(SignInState.SignInError("Signed out from server."))
+    private suspend fun forceSignOut() {
+        prefs.edit(commit = true) {
+            remove(PREF_USERNAME)
+            remove(PREF_SESSION_ID)
+            remove(PREF_CREDENTIALS)
         }
+        signInStateMutable.emit(SignInState.SignInError("Signed out from server."))
     }
 
     /**
      * Starts to register a new credential to the server. This should be called only when the
      * sign-in state is [SignInState.SignedIn].
      */
-    fun registerRequest(processing: MutableLiveData<Boolean>): LiveData<PendingIntent?> {
-        val result = MutableLiveData<PendingIntent?>()
-        executor.execute {
-            fido2ApiClient?.let { client ->
-                processing.postValue(true)
-                try {
-                    val sessionId = prefs.getString(PREF_SESSION_ID, null)!!
+    suspend fun registerRequest(): PendingIntent? {
+        fido2ApiClient?.let { client ->
+            try {
+                val sessionId = prefs.getString(PREF_SESSION_ID, null)!!
 
-                    // TODO(1): Call the server API: /registerRequest
-                    // - Use api.registerRequest to get an ApiResult of
-                    //   PublicKeyCredentialCreationOptions.
-                    // - Call fido2ApiClient.getRegisterIntent and create an intent to generate a
-                    //   new credential.
-                    // - Pass the intent back to the `result` LiveData so that the UI can open the
-                    //   fingerprint dialog.
+                // TODO(1): Call the server API: /registerRequest
+                // - Use api.registerRequest to get an ApiResult of
+                //   PublicKeyCredentialCreationOptions.
+                // - Call fido2ApiClient.getRegisterIntent and create an intent to generate a
+                //   new credential.
+                // - Pass the intent back to the `result` LiveData so that the UI can open the
+                //   fingerprint dialog.
 
-                } catch (e: Exception) {
-                    Log.e(TAG, "Cannot call registerRequest", e)
-                } finally {
-                    processing.postValue(false)
-                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Cannot call registerRequest", e)
             }
         }
-        return result
+        return null
     }
 
     /**
      * Finishes registering a new credential to the server. This should only be called after
      * a call to [registerRequest] and a local FIDO2 API for public key generation.
      */
-    fun registerResponse(credential: PublicKeyCredential, processing: MutableLiveData<Boolean>) {
-        executor.execute {
-            processing.postValue(true)
-            try {
-                val sessionId = prefs.getString(PREF_SESSION_ID, null)!!
+    suspend fun registerResponse(credential: PublicKeyCredential) {
+        try {
+            val sessionId = prefs.getString(PREF_SESSION_ID, null)!!
 
-                // TODO(3): Call the server API: /registerResponse
-                // - Create an AuthenticatorAttestationResponse from the data intent generated by
-                //   the fingerprint dialog.
-                // - Use api.registerResponse to send the response back to the server.
-                // - Save the returned list of credentials into the SharedPreferences. The key is
-                //   PREF_CREDENTIALS.
-                // - Also save the newly added credential ID into the SharedPreferences. The key is
-                //   PREF_LOCAL_CREDENTIAL_ID. The ID can be obtained from the `keyHandle` field of
-                //   the AuthenticatorAttestationResponse object.
+            // TODO(3): Call the server API: /registerResponse
+            // - Create an AuthenticatorAttestationResponse from the data intent generated by
+            //   the fingerprint dialog.
+            // - Use api.registerResponse to send the response back to the server.
+            // - Save the returned list of credentials into the SharedPreferences. The key is
+            //   PREF_CREDENTIALS.
+            // - Also save the newly added credential ID into the SharedPreferences. The key is
+            //   PREF_LOCAL_CREDENTIAL_ID. The ID can be obtained from the `keyHandle` field of
+            //   the AuthenticatorAttestationResponse object.
 
-            } catch (e: ApiException) {
-                Log.e(TAG, "Cannot call registerResponse", e)
-            } finally {
-                processing.postValue(false)
-            }
+        } catch (e: ApiException) {
+            Log.e(TAG, "Cannot call registerResponse", e)
         }
     }
 
     /**
      * Removes a credential registered on the server.
      */
-    fun removeKey(credentialId: String, processing: MutableLiveData<Boolean>) {
-        executor.execute {
-            processing.postValue(true)
-            try {
-                val sessionId = prefs.getString(PREF_SESSION_ID, null)!!
-                when (api.removeKey(sessionId, credentialId)) {
-                    ApiResult.SignedOutFromServer -> forceSignOut()
-                    is ApiResult.Success -> refreshCredentials()
-                }
-            } catch (e: ApiException) {
-                Log.e(TAG, "Cannot call removeKey", e)
-            } finally {
-                processing.postValue(false)
+    suspend fun removeKey(credentialId: String) {
+        try {
+            val sessionId = prefs.getString(PREF_SESSION_ID, null)!!
+            when (api.removeKey(sessionId, credentialId)) {
+                ApiResult.SignedOutFromServer -> forceSignOut()
+                is ApiResult.Success -> refreshCredentials()
             }
+        } catch (e: ApiException) {
+            Log.e(TAG, "Cannot call removeKey", e)
         }
     }
 
@@ -337,58 +275,45 @@ class AuthRepository @Inject constructor(
      * Starts to sign in with a FIDO2 credential. This should only be called when the sign-in state
      * is [SignInState.SigningIn].
      */
-    fun signinRequest(processing: MutableLiveData<Boolean>): LiveData<PendingIntent?> {
-        val result = MutableLiveData<PendingIntent?>()
-        executor.execute {
-            fido2ApiClient?.let { client ->
-                processing.postValue(true)
-                try {
-                    val sessionId = prefs.getString(PREF_SESSION_ID, null)!!
-                    val credentialId = prefs.getString(PREF_LOCAL_CREDENTIAL_ID, null)
+    suspend fun signinRequest(): PendingIntent? {
+        fido2ApiClient?.let { client ->
+            val sessionId = prefs.getString(PREF_SESSION_ID, null)!!
+            val credentialId = prefs.getString(PREF_LOCAL_CREDENTIAL_ID, null)
 
-                    // TODO(4): Call the server API: /signinRequest
-                    // - Use api.signinRequest to get a PublicKeyCredentialRequestOptions.
-                    // - Call fido2ApiClient.getSignIntent and create an intent to assert the
-                    //   credential.
-                    // - Pass the intent to the `result` LiveData so that the UI can open the
-                    //   fingerprint dialog.
+            // TODO(4): Call the server API: /signinRequest
+            // - Use api.signinRequest to get a PublicKeyCredentialRequestOptions.
+            // - Call fido2ApiClient.getSignIntent and create an intent to assert the
+            //   credential.
+            // - Pass the intent to the `result` LiveData so that the UI can open the
+            //   fingerprint dialog.
 
-                } finally {
-                    processing.postValue(false)
-                }
-            }
         }
-        return result
+        return null
     }
 
     /**
      * Finishes to signing in with a FIDO2 credential. This should only be called after a call to
      * [signinRequest] and a local FIDO2 API for key assertion.
      */
-    fun signinResponse(credential: PublicKeyCredential, processing: MutableLiveData<Boolean>) {
-        executor.execute {
-            processing.postValue(true)
-            try {
-                val username = prefs.getString(PREF_USERNAME, null)!!
-                val sessionId = prefs.getString(PREF_SESSION_ID, null)!!
+    suspend fun signinResponse(credential: PublicKeyCredential) {
+        try {
+            val username = prefs.getString(PREF_USERNAME, null)!!
+            val sessionId = prefs.getString(PREF_SESSION_ID, null)!!
 
-                // TODO(6): Call the server API: /signinResponse
-                // - Create an AuthenticatorAssertionResponse from the data intent generated by
-                //   the fingerprint dialog.
-                // - Use api.signinResponse to send the response back to the server.
-                // - Save the returned list of credentials into the SharedPreferences. The key is
-                //   PREF_CREDENTIALS.
-                // - Also save the credential ID into the SharedPreferences. The key is
-                //   PREF_LOCAL_CREDENTIAL_ID. The ID can be obtained from the `keyHandle` field of
-                //   the AuthenticatorAssertionResponse object.
-                // - Notify the UI that the sign-in has succeeded. This can be done by calling
-                //   `invokeSignInStateListeners(SignInState.SignedIn(username))`
+            // TODO(6): Call the server API: /signinResponse
+            // - Create an AuthenticatorAssertionResponse from the data intent generated by
+            //   the fingerprint dialog.
+            // - Use api.signinResponse to send the response back to the server.
+            // - Save the returned list of credentials into the SharedPreferences. The key is
+            //   PREF_CREDENTIALS.
+            // - Also save the credential ID into the SharedPreferences. The key is
+            //   PREF_LOCAL_CREDENTIAL_ID. The ID can be obtained from the `keyHandle` field of
+            //   the AuthenticatorAssertionResponse object.
+            // - Notify the UI that the sign-in has succeeded. This can be done by calling
+            //   `invokeSignInStateListeners(SignInState.SignedIn(username))`
 
-            } catch (e: ApiException) {
-                Log.e(TAG, "Cannot call registerResponse", e)
-            } finally {
-                processing.postValue(false)
-            }
+        } catch (e: ApiException) {
+            Log.e(TAG, "Cannot call registerResponse", e)
         }
     }
 
