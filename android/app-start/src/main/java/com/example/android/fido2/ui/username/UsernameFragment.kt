@@ -56,7 +56,7 @@ class UsernameFragment : Fragment() {
         }
 
         binding.inputUsername.setOnEditorActionListener { _, actionId, _ ->
-            if (actionId == EditorInfo.IME_ACTION_GO) {
+            if (actionId == EditorInfo.IME_ACTION_NEXT) {
                 viewModel.sendUsername()
                 true
             } else {

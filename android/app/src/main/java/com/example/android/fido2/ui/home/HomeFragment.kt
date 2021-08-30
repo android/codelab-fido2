@@ -26,6 +26,7 @@ import androidx.activity.result.ActivityResult
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
@@ -71,11 +72,8 @@ class HomeFragment : Fragment(), DeleteConfirmationFragment.Listener {
         viewLifecycleOwner.lifecycleScope.launchWhenStarted {
             viewModel.credentials.collect { credentials ->
                 credentialAdapter.submitList(credentials)
-                binding.emptyCredentials.visibility = if (credentials.isEmpty()) {
-                    View.VISIBLE
-                } else {
-                    View.INVISIBLE
-                }
+                binding.emptyCredentials.isVisible = credentials.isEmpty()
+                binding.credentialsCaption.isVisible = credentials.isNotEmpty()
             }
         }
 

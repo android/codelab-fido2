@@ -72,7 +72,7 @@ class AuthViewModel @Inject constructor(
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(), "(user)")
 
-    fun auth() {
+    fun submitPassword() {
         viewModelScope.launch {
             _processing.value = true
             try {

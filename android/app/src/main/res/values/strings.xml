@@ -34,11 +34,12 @@
 
     <!-- Home -->
     <string name="credentials_caption">Your registered credentials:</string>
-    <string name="empty_credentials">You don\'t have any credentials.</string>
+    <string name="empty_credentials">"You don't have any credentials.\nTap '+' to add one."</string>
     <string name="reauth">Reauth</string>
     <string name="sign_out">Sign Out</string>
     <string name="delete">Delete</string>
     <string name="delete_confirmation">Are you sure you want to delete this credential?\n\n%s</string>
     <string name="credential_error">Error creating credential</string>
+    <string name="add_credential">Add credential</string>
 
 </resources>

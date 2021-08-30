@@ -14,7 +14,8 @@
   ~ See the License for the specific language governing permissions and
   ~ limitations under the License.
 -->
-<layout xmlns:android="http://schemas.android.com/apk/res/android"
+<layout
+    xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools">
 
@@ -67,8 +68,8 @@
                 android:layout_height="0dp"
                 android:clipToPadding="false"
                 android:orientation="vertical"
-                android:paddingTop="@dimen/spacing_medium"
                 android:paddingBottom="@dimen/dodge_app_bar"
+                android:paddingTop="@dimen/spacing_medium"
                 app:layout_constraintBottom_toBottomOf="parent"
                 app:layout_constraintEnd_toEndOf="parent"
                 app:layout_constraintStart_toStartOf="parent"
@@ -80,10 +81,11 @@
                 android:id="@+id/empty_credentials"
                 android:layout_width="0dp"
                 android:layout_height="0dp"
+                android:gravity="center_horizontal"
                 android:padding="@dimen/spacing_large"
                 android:text="@string/empty_credentials"
                 android:textAppearance="@style/TextAppearance.MaterialComponents.Headline5"
-                android:visibility="invisible"
+                android:visibility="gone"
                 app:layout_constraintBottom_toBottomOf="@id/credentials"
                 app:layout_constraintEnd_toEndOf="@id/credentials"
                 app:layout_constraintStart_toStartOf="@id/credentials"
@@ -117,6 +119,7 @@
             android:id="@+id/add"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:contentDescription="@string/add_credential"
             app:layout_anchor="@id/app_bar"
             app:srcCompat="@drawable/ic_add" />
 

@@ -54,8 +54,10 @@ private val DIFF_CALLBACK = object : DiffUtil.ItemCallback<Credential>() {
     }
 }
 
-class CredentialViewHolder(val binding: CredentialItemBinding, onDeleteClicked: (String) -> Unit) :
-    RecyclerView.ViewHolder(binding.root) {
+class CredentialViewHolder(
+    val binding: CredentialItemBinding,
+    onDeleteClicked: (String) -> Unit
+) : RecyclerView.ViewHolder(binding.root) {
     init {
         binding.delete.setOnClickListener {
             binding.credential?.let { c ->
