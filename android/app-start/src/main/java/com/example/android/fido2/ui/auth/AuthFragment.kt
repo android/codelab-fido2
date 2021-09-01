@@ -21,6 +21,7 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.view.inputmethod.EditorInfo
 import android.widget.Toast
 import androidx.activity.result.ActivityResult
 import androidx.activity.result.ActivityResultLauncher
@@ -62,6 +63,15 @@ class AuthFragment : Fragment() {
             ActivityResultContracts.StartIntentSenderForResult(),
             ::handleSignResult
         )
+
+        binding.inputPassword.setOnEditorActionListener { _, actionId, _ ->
+            if (actionId == EditorInfo.IME_ACTION_GO) {
+                viewModel.submitPassword()
+                true
+            } else {
+                false
+            }
+        }
 
         viewLifecycleOwner.lifecycleScope.launchWhenStarted {
             launch {
