@@ -47,7 +47,9 @@ class HomeViewModel @Inject constructor(
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(), "(user)")
 
-    val credentials = repository.getCredentials()
+    val credentials = repository.credentials.stateIn(
+        viewModelScope, SharingStarted.WhileSubscribed(), emptyList()
+    )
 
     fun reauth() {
         viewModelScope.launch {
