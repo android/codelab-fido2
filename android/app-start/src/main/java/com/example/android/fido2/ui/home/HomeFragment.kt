@@ -122,7 +122,8 @@ class HomeFragment : Fragment(), DeleteConfirmationFragment.Listener {
     private fun handleCreateCredentialResult(activityResult: ActivityResult) {
 
         // TODO(3): Receive ActivityResult with the new Credential
-        // - Extract byte array from result data using Fido.FIDO2_KEY_CREDENTIAL_EXTRA
+        // - Extract byte array from result data using Fido.FIDO2_KEY_CREDENTIAL_EXTRA.
+        // (continued below
         val bytes: ByteArray? = null
 
         when {
@@ -134,7 +135,7 @@ class HomeFragment : Fragment(), DeleteConfirmationFragment.Listener {
             else -> {
 
                 // - Deserialize bytes into a PublicKeyCredential.
-                // - Check if the response is an AuthenticationErrorResponse. If it is, show a toast.
+                // - Check if the response is an AuthenticationErrorResponse. If so, show a toast.
                 // - Otherwise, pass the credential to the viewModel.
 
             }
