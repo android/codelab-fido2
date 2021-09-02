@@ -24,7 +24,6 @@ import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
 import android.widget.Toast
 import androidx.activity.result.ActivityResult
-import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.fragment.app.Fragment
@@ -45,7 +44,10 @@ class AuthFragment : Fragment() {
     private val viewModel: AuthViewModel by viewModels()
     private lateinit var binding: AuthFragmentBinding
 
-    private lateinit var signIntentLauncher: ActivityResultLauncher<IntentSenderRequest>
+    private val signIntentLauncher = registerForActivityResult(
+        ActivityResultContracts.StartIntentSenderForResult(),
+        ::handleSignResult
+    )
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -59,11 +61,6 @@ class AuthFragment : Fragment() {
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
-        signIntentLauncher = registerForActivityResult(
-            ActivityResultContracts.StartIntentSenderForResult(),
-            ::handleSignResult
-        )
-
         binding.inputPassword.setOnEditorActionListener { _, actionId, _ ->
             if (actionId == EditorInfo.IME_ACTION_GO) {
                 viewModel.submitPassword()

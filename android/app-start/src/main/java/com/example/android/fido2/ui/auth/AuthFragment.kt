@@ -24,17 +24,12 @@ import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
 import android.widget.Toast
 import androidx.activity.result.ActivityResult
-import androidx.activity.result.ActivityResultLauncher
-import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
 import com.example.android.fido2.R
 import com.example.android.fido2.databinding.AuthFragmentBinding
-import com.google.android.gms.fido.Fido
-import com.google.android.gms.fido.fido2.api.common.AuthenticatorErrorResponse
-import com.google.android.gms.fido.fido2.api.common.PublicKeyCredential
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
@@ -45,7 +40,10 @@ class AuthFragment : Fragment() {
     private val viewModel: AuthViewModel by viewModels()
     private lateinit var binding: AuthFragmentBinding
 
-    private lateinit var signIntentLauncher: ActivityResultLauncher<IntentSenderRequest>
+    private val signIntentLauncher = registerForActivityResult(
+        ActivityResultContracts.StartIntentSenderForResult(),
+        ::handleSignResult
+    )
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -59,11 +57,6 @@ class AuthFragment : Fragment() {
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
-        signIntentLauncher = registerForActivityResult(
-            ActivityResultContracts.StartIntentSenderForResult(),
-            ::handleSignResult
-        )
-
         binding.inputPassword.setOnEditorActionListener { _, actionId, _ ->
             if (actionId == EditorInfo.IME_ACTION_GO) {
                 viewModel.submitPassword()
@@ -77,7 +70,7 @@ class AuthFragment : Fragment() {
             launch {
                 viewModel.signinRequests.collect { intent ->
 
-                    // TODO(5): Open the fingerprint dialog.
+                    // TODO(6): Open the fingerprint dialog.
                     // - Open the fingerprint dialog by launching the intent from FIDO2 API.
 
                 }
@@ -95,21 +88,22 @@ class AuthFragment : Fragment() {
     }
 
     private fun handleSignResult(activityResult: ActivityResult) {
-        val bytes = activityResult.data?.getByteArrayExtra(Fido.FIDO2_KEY_CREDENTIAL_EXTRA)
+
+        // TODO(7): Handle the ActivityResult
+        // - Extract byte array from result data using Fido.FIDO2_KEY_CREDENTIAL_EXTRA
+        val bytes: ByteArray? = null
+
         when {
             activityResult.resultCode != Activity.RESULT_OK ->
                 Toast.makeText(requireContext(), R.string.cancelled, Toast.LENGTH_SHORT).show()
             bytes == null ->
                 Toast.makeText(requireContext(), R.string.auth_error, Toast.LENGTH_SHORT).show()
             else -> {
-                val credential = PublicKeyCredential.deserializeFromBytes(bytes)
-                val response = credential.response
-                if (response is AuthenticatorErrorResponse) {
-                    Toast.makeText(requireContext(), response.errorMessage, Toast.LENGTH_SHORT)
-                        .show()
-                } else {
-                    viewModel.signinResponse(credential)
-                }
+
+                // - Deserialize bytes into a PublicKeyCredential.
+                // - Check if the response is an AuthenticationErrorResponse. If it is, show a toast.
+                // - Otherwise, pass the credential to the viewModel.
+
             }
         }
     }

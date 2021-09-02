@@ -23,7 +23,6 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
 import androidx.activity.result.ActivityResult
-import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.view.isVisible
@@ -50,7 +49,10 @@ class HomeFragment : Fragment(), DeleteConfirmationFragment.Listener {
     private val viewModel: HomeViewModel by viewModels()
     private lateinit var binding: HomeFragmentBinding
 
-    private lateinit var createCredentialIntentLauncher: ActivityResultLauncher<IntentSenderRequest>
+    private val createCredentialIntentLauncher = registerForActivityResult(
+        ActivityResultContracts.StartIntentSenderForResult(),
+        ::handleCreateCredentialResult
+    )
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -92,11 +94,6 @@ class HomeFragment : Fragment(), DeleteConfirmationFragment.Listener {
                 else -> false
             }
         }
-
-        createCredentialIntentLauncher = registerForActivityResult(
-            ActivityResultContracts.StartIntentSenderForResult(),
-            ::handleCreateCredentialResult
-        )
 
         viewLifecycleOwner.lifecycleScope.launchWhenStarted {
             viewModel.processing.collect { processing ->
