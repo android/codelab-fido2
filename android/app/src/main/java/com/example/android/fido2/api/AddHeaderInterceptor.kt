@@ -19,10 +19,12 @@ package com.example.android.fido2.api
 import okhttp3.Interceptor
 import okhttp3.Response
 
-internal class AddHeaderInterceptor : Interceptor {
+internal class AddHeaderInterceptor(private val userAgent: String) : Interceptor {
+
     override fun intercept(chain: Interceptor.Chain): Response {
         return chain.proceed(
             chain.request().newBuilder()
+                .header("User-Agent", userAgent)
                 .header("X-Requested-With", "XMLHttpRequest")
                 .build()
         )
