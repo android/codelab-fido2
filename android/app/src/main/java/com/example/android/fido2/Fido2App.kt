@@ -17,6 +17,7 @@
 package com.example.android.fido2
 
 import android.app.Application
+import android.os.Build
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
@@ -43,8 +44,10 @@ object AppModule {
     @Singleton
     @Provides
     fun provideOkHttpClient() : OkHttpClient {
+        val userAgent = "${BuildConfig.APPLICATION_ID}/${BuildConfig.VERSION_NAME} " +
+            "(Android ${Build.VERSION.RELEASE}; ${Build.MODEL}; ${Build.BRAND})"
         return OkHttpClient.Builder()
-            .addInterceptor(AddHeaderInterceptor())
+            .addInterceptor(AddHeaderInterceptor(userAgent))
             .readTimeout(30, TimeUnit.SECONDS)
             .writeTimeout(40, TimeUnit.SECONDS)
             .connectTimeout(40, TimeUnit.SECONDS)
