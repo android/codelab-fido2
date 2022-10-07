@@ -29,7 +29,7 @@ export const _fetch = async (path, payload = '') => {
     body: payload,
   });
   if (res.status === 200) {
-    // Server authentication succeeded
+    // Server authentication succeeded 
     return res.json();
   } else {
     // Server authentication failed
