@@ -401,7 +401,7 @@ class AuthApi @Inject constructor(
         return PublicKeyCredentialUserEntity(
             id!!.decodeBase64(),
             name!!,
-            null, // icon
+            "", // icon
             displayName
         )
     }
