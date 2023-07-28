@@ -317,6 +317,7 @@ class AuthApi @Inject constructor(
                         parseSelection(reader)
                     )
                     "rp" -> builder.setRp(parseRp(reader))
+                    "extensions" -> reader.skipValue() // Unused
                 }
             }
             reader.endObject()
@@ -401,7 +402,7 @@ class AuthApi @Inject constructor(
         return PublicKeyCredentialUserEntity(
             id!!.decodeBase64(),
             name!!,
-            null, // icon
+            "", // icon
             displayName
         )
     }
