@@ -15,7 +15,7 @@
     "@material/mwc-fab": "^0.19.1",
     "@material/mwc-top-app-bar-fixed": "^0.19.1",
     "@material/mwc-textfield": "^0.19.1",
-    "webpack": "^4.44.1",
+    "webpack": "^5.97.1",
     "webpack-cli": "^3.3.12",
     "@babel/core": "^7.12.3",
     "babel-loader": "^8.1.0",
